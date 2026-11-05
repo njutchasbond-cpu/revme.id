@@ -61,7 +61,7 @@ CREATE INDEX IF NOT EXISTS idx_cards_owner_id ON public.cards(owner_id);
 CREATE TABLE IF NOT EXISTS public.interaction_logs (
     id BIGSERIAL PRIMARY KEY,
     card_id UUID REFERENCES public.cards(id) ON DELETE CASCADE,
-    interaction_type VARCHAR(50) NOT NULL, -- 'card_tap', 'click_review', 'click_wifi', 'click_menu', 'click_services', 'click_instagram', 'click_tiktok', 'click_website', 'click_whatsapp'
+    interaction_type VARCHAR(50) NOT NULL,
     device_type VARCHAR(20) DEFAULT 'Unknown',
     user_agent TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
@@ -75,12 +75,23 @@ CREATE INDEX IF NOT EXISTS idx_interaction_logs_created_at ON public.interaction
 ALTER TABLE public.cards ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.interaction_logs ENABLE ROW LEVEL SECURITY;
 
+-- Bersihkan policy lama jika sudah ada agar tidak bentrok
+DROP POLICY IF EXISTS "Public can view card data" ON public.cards;
+DROP POLICY IF EXISTS "Public can claim unclaimed card" ON public.cards;
+DROP POLICY IF EXISTS "Public can insert card on claim" ON public.cards;
+DROP POLICY IF EXISTS "Owner can update own card" ON public.cards;
+DROP POLICY IF EXISTS "Public can insert interaction logs" ON public.interaction_logs;
+
+-- Pasang policy keamanan baru
 CREATE POLICY "Public can view card data" ON public.cards
     FOR SELECT USING (true);
 
 CREATE POLICY "Public can claim unclaimed card" ON public.cards
     FOR UPDATE USING (status = 'unclaimed')
     WITH CHECK (status = 'active');
+
+CREATE POLICY "Public can insert card on claim" ON public.cards
+    FOR INSERT WITH CHECK (true);
 
 CREATE POLICY "Owner can update own card" ON public.cards
     FOR UPDATE USING (auth.uid() = owner_id);
