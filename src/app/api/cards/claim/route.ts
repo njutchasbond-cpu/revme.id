@@ -29,7 +29,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Nama bisnis dan Place ID wajib diisi' }, { status: 400 });
     }
 
-    const review_url = `https://search.google.com/local/writereview?placeid=${google_place_id}`;
+    const review_url = google_place_id.startsWith('ChIJ')
+      ? `https://search.google.com/local/writereview?placeid=${google_place_id}`
+      : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(business_name + (business_address ? ' ' + business_address : ''))}`;
     const normalizedCode = short_code.toUpperCase();
     const now = new Date().toISOString();
 

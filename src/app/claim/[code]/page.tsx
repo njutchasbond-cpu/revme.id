@@ -33,6 +33,8 @@ export default function ClaimPage({ params }: { params: Promise<{ code: string }
     name: string;
     address: string;
   } | null>(null);
+  const [placeAddress, setPlaceAddress] = useState('');
+  const [isEditingAddress, setIsEditingAddress] = useState(false);
 
   // Form Fields
   const [phone, setPhone] = useState('');
@@ -79,11 +81,16 @@ export default function ClaimPage({ params }: { params: Promise<{ code: string }
   }, [searchQuery, selectedPlace]);
 
   const handleSelectPlace = async (prediction: PlacePrediction) => {
+    const isCustom = prediction.place_id.startsWith('custom_');
+    const addr = isCustom ? '' : (prediction.secondary_text || prediction.description || '');
+
     setSelectedPlace({
       place_id: prediction.place_id,
       name: prediction.main_text,
-      address: prediction.secondary_text || prediction.description,
+      address: addr,
     });
+    setPlaceAddress(addr);
+    setIsEditingAddress(isCustom);
     setSearchQuery(prediction.main_text);
     setPredictions([]);
   };
@@ -110,7 +117,7 @@ export default function ClaimPage({ params }: { params: Promise<{ code: string }
           short_code: code,
           business_name: selectedPlace.name,
           business_category: category,
-          business_address: selectedPlace.address,
+          business_address: placeAddress.trim() || selectedPlace.address || null,
           google_place_id: selectedPlace.place_id,
           owner_phone: phone,
           mode,
@@ -215,7 +222,11 @@ export default function ClaimPage({ params }: { params: Promise<{ code: string }
                     value={searchQuery}
                     onChange={(e) => {
                       setSearchQuery(e.target.value);
-                      if (selectedPlace) setSelectedPlace(null);
+                      if (selectedPlace) {
+                        setSelectedPlace(null);
+                        setPlaceAddress('');
+                        setIsEditingAddress(false);
+                      }
                     }}
                     placeholder="Contoh: Kopi Kenangan Senopati"
                     className="w-full px-3.5 py-2.5 pl-10 text-sm bg-slate-950 border border-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-white placeholder:text-slate-500 outline-none transition"
@@ -250,24 +261,68 @@ export default function ClaimPage({ params }: { params: Promise<{ code: string }
                 )}
 
                 {selectedPlace && (
-                  <div className="mt-2.5 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-start justify-between gap-2">
-                    <div className="flex items-start gap-2">
-                      <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                      <div>
-                        <div className="text-xs font-bold text-white">{selectedPlace.name}</div>
-                        <div className="text-[11px] text-slate-400">{selectedPlace.address}</div>
+                  <div className="mt-2.5 p-3.5 bg-slate-950/90 border border-slate-800 rounded-xl space-y-2.5">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-start gap-2">
+                        <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                        <div>
+                          <div className="text-xs font-bold text-white">{selectedPlace.name}</div>
+                          <div className="text-[11px] text-slate-400">
+                            {selectedPlace.place_id.startsWith('custom_')
+                              ? 'Nama brand / toko mandiri'
+                              : 'Lokasi terverifikasi di peta'}
+                          </div>
+                        </div>
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedPlace(null);
+                          setPlaceAddress('');
+                          setIsEditingAddress(false);
+                          setSearchQuery('');
+                        }}
+                        className="text-[11px] text-slate-400 hover:text-rose-400 underline shrink-0"
+                      >
+                        Ganti Nama
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedPlace(null);
-                        setSearchQuery('');
-                      }}
-                      className="text-[11px] text-slate-400 hover:text-rose-400 underline shrink-0"
-                    >
-                      Ubah
-                    </button>
+
+                    {/* Alamat Resmi Toko */}
+                    <div className="pt-2 border-t border-slate-800/80">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-[11px] font-medium text-slate-300 flex items-center gap-1">
+                          <MapPin className="w-3 h-3 text-blue-400" /> Alamat Resmi Toko
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setIsEditingAddress(!isEditingAddress)}
+                          className="text-[11px] text-blue-400 hover:text-blue-300 underline"
+                        >
+                          {isEditingAddress ? 'Selesai' : 'Sesuaikan Alamat'}
+                        </button>
+                      </div>
+
+                      {isEditingAddress ? (
+                        <div className="space-y-1">
+                          <input
+                            type="text"
+                            value={placeAddress}
+                            onChange={(e) => setPlaceAddress(e.target.value)}
+                            placeholder="Contoh: Jl. Ahmad Yani No. 10, Pringsewu, Lampung"
+                            className="w-full px-3 py-2 text-xs bg-slate-900 border border-slate-700 rounded-lg text-white placeholder:text-slate-500 outline-none focus:ring-1 focus:ring-blue-500"
+                            autoFocus
+                          />
+                          <p className="text-[10px] text-slate-400">
+                            Sistem mengambil alamat resmi otomatis. Anda dapat melengkapi nomor ruko atau patokan detail jika diperlukan.
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-slate-200 bg-slate-900/70 px-3 py-2 rounded-lg border border-slate-800/80">
+                          {placeAddress || 'Belum ada alamat terdeteksi. Klik "Sesuaikan Alamat" untuk mengisi.'}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
