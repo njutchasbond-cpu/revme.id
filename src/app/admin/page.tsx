@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import QRCode from 'qrcode';
+import JSZip from 'jszip';
 import {
   CreditCard,
   Download,
@@ -11,6 +13,9 @@ import {
   AlertCircle,
   ExternalLink,
   ShieldAlert,
+  QrCode,
+  X,
+  FileArchive
 } from 'lucide-react';
 import type { Card } from '@/lib/types';
 
@@ -26,6 +31,14 @@ export default function AdminPage() {
   const [prefix, setPrefix] = useState('DW');
   const [batchName, setBatchName] = useState('BATCH-01');
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
+  // QR Code Export State
+  const [isExportingQR, setIsExportingQR] = useState(false);
+  const [qrProgress, setQrProgress] = useState<{ current: number; total: number } | null>(null);
+
+  // Single QR Preview Modal State
+  const [previewCard, setPreviewCard] = useState<Card | null>(null);
+  const [previewQrDataUrl, setPreviewQrDataUrl] = useState<string>('');
 
   const fetchCards = async () => {
     setIsLoading(true);
@@ -99,11 +112,12 @@ export default function AdminPage() {
     if (cards.length === 0) return;
     const appUrl = window.location.origin;
 
-    const headers = ['Short Code', 'URL Redirect', 'Status', 'Nama Bisnis', 'WhatsApp', 'Batch', 'Tap Count'];
+    const headers = ['Short Code', 'URL Redirect', 'Status', 'Mode', 'Nama Bisnis', 'WhatsApp', 'Batch', 'Tap Count'];
     const rows = cards.map((c) => [
       c.short_code,
       `${appUrl}/c/${c.short_code}`,
       c.status,
+      c.mode || 'smart_hub',
       `"${c.business_name || ''}"`,
       `"${c.owner_phone || ''}"`,
       c.batch_number || '',
@@ -118,6 +132,80 @@ export default function AdminPage() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const handleExportQRCodesZip = async () => {
+    if (cards.length === 0) return;
+    setIsExportingQR(true);
+    setQrProgress({ current: 0, total: cards.length });
+
+    try {
+      const zip = new JSZip();
+      const appUrl = window.location.origin;
+      const folderName = `qrcodes_${batchName || 'batch'}`;
+      const folder = zip.folder(folderName);
+
+      for (let i = 0; i < cards.length; i++) {
+        const c = cards[i];
+        const targetUrl = `${appUrl}/c/${c.short_code}`;
+
+        // Generate data URL QR Code dengan resolusi cetak tinggi (width 800px)
+        const dataUrl = await QRCode.toDataURL(targetUrl, {
+          width: 800,
+          margin: 2,
+          errorCorrectionLevel: 'M',
+          color: {
+            dark: '#000000',
+            light: '#FFFFFF',
+          },
+        });
+
+        // Potong header base64 dan simpan ke zip
+        const base64Data = dataUrl.replace(/^data:image\/png;base64,/, '');
+        folder?.file(`${c.short_code}.png`, base64Data, { base64: true });
+
+        setQrProgress({ current: i + 1, total: cards.length });
+      }
+
+      // Tambahkan catatan informasi batch di dalam zip
+      folder?.file(
+        'README_INFORMASI.txt',
+        `Batch Produksi: ${batchName}\nTotal Gambar QR: ${cards.length}\nTanggal Export: ${new Date().toLocaleString('id-ID')}\nFormat URL: ${appUrl}/c/[KODE_SERIAL]\n\nDiberdayakan oleh studiokalcer.com`
+      );
+
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(zipBlob);
+      link.download = `qrcodes_${batchName}_${Date.now()}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      setMessage({
+        text: `Berhasil mengunduh ${cards.length} file QR Code dalam format ZIP!`,
+        type: 'success',
+      });
+    } catch (err: any) {
+      setMessage({
+        text: `Gagal men-generate ZIP: ${err.message}`,
+        type: 'error',
+      });
+    } finally {
+      setIsExportingQR(false);
+      setQrProgress(null);
+    }
+  };
+
+  const handleOpenQrPreview = async (c: Card) => {
+    setPreviewCard(c);
+    const appUrl = window.location.origin;
+    const targetUrl = `${appUrl}/c/${c.short_code}`;
+    const dataUrl = await QRCode.toDataURL(targetUrl, {
+      width: 600,
+      margin: 2,
+      errorCorrectionLevel: 'M',
+    });
+    setPreviewQrDataUrl(dataUrl);
   };
 
   const filteredCards = cards.filter((c) => {
@@ -136,6 +224,7 @@ export default function AdminPage() {
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 p-4 sm:p-8">
       <div className="max-w-6xl mx-auto space-y-6">
+        
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
           <div>
@@ -143,20 +232,49 @@ export default function AdminPage() {
               <span className="p-2 bg-blue-100 text-blue-600 rounded-xl">
                 <CreditCard className="w-5 h-5" />
               </span>
-              <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Super Admin: Kartu NFC Review</h1>
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Super Admin: Kartu Pintar & Review</h1>
             </div>
             <p className="text-xs sm:text-sm text-gray-500 mt-1">
-              Kelola stok kartu, generate batch cetak percetakan, dan pantau status First-Tap Claim.
+              Kelola stok kartu, generate batch cetak, export CSV & QR Code, dan pantau status First-Tap Claim.
             </p>
           </div>
-          <div className="flex items-center gap-2.5">
+
+          {/* Action Buttons */}
+          <div className="flex flex-wrap items-center gap-2.5">
+            
+            {/* Tombol Export QR Codes ZIP */}
+            <button
+              onClick={handleExportQRCodesZip}
+              disabled={cards.length === 0 || isExportingQR}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white text-xs sm:text-sm font-semibold transition-all shadow-sm"
+              title="Unduh seluruh gambar QR Code dalam berkas ZIP"
+            >
+              {isExportingQR ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span>
+                    {qrProgress ? `${qrProgress.current}/${qrProgress.total}` : 'Memproses...'}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <FileArchive className="w-4 h-4" />
+                  <span>Export QR Code (ZIP)</span>
+                </>
+              )}
+            </button>
+
+            {/* Tombol Export CSV */}
             <button
               onClick={handleExportCSV}
               disabled={cards.length === 0}
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gray-900 hover:bg-black text-white text-xs sm:text-sm font-semibold transition-all shadow-sm"
+              title="Unduh data tabel CSV untuk vendor percetakan"
             >
               <Download className="w-4 h-4" /> Export CSV Percetakan
             </button>
+
+            {/* Tombol Refresh */}
             <button
               onClick={fetchCards}
               className="p-2.5 border border-gray-200 hover:bg-gray-100 rounded-xl transition-all"
@@ -203,6 +321,7 @@ export default function AdminPage() {
 
         {/* Grid: Generator Form & Filter */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          
           {/* Card Generator Form */}
           <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
             <h2 className="text-sm font-bold uppercase tracking-wider text-gray-700 mb-3 flex items-center gap-2">
@@ -325,7 +444,7 @@ export default function AdminPage() {
                             <span
                               className={`px-2 py-0.5 rounded-md text-[10px] font-semibold tracking-wide uppercase ${
                                 c.status === 'active'
-                                  ? 'bg-green-100 text-green-700'
+                                    ? 'bg-green-100 text-green-700'
                                   : c.status === 'unclaimed'
                                   ? 'bg-amber-100 text-amber-700'
                                   : 'bg-gray-100 text-gray-600'
@@ -348,19 +467,32 @@ export default function AdminPage() {
                             {c.tap_count || 0}
                           </td>
                           <td className="py-2.5 px-3 text-right space-x-1.5 whitespace-nowrap">
+                            
+                            {/* Tombol Preview & Unduh QR Satuan */}
+                            <button
+                              onClick={() => handleOpenQrPreview(c)}
+                              className="inline-flex items-center gap-1 p-1.5 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                              title="Lihat & Unduh QR Code Kartu Ini"
+                            >
+                              <QrCode className="w-3.5 h-3.5" />
+                            </button>
+
+                            {/* Tombol Test Tap Redirect */}
                             <a
                               href={`/c/${c.short_code}`}
                               target="_blank"
                               rel="noreferrer"
-                              className="inline-flex items-center gap-1 p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg"
+                              className="inline-flex items-center gap-1 p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition"
                               title="Test Tap Redirect"
                             >
                               <ExternalLink className="w-3.5 h-3.5" />
                             </a>
+
+                            {/* Tombol Force Reset */}
                             {c.status === 'active' && (
                               <button
                                 onClick={() => handleResetCard(c.short_code)}
-                                className="inline-flex items-center gap-1 p-1.5 text-red-600 hover:bg-red-50 rounded-lg"
+                                className="inline-flex items-center gap-1 p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition"
                                 title="Force Reset to Unclaimed"
                               >
                                 <ShieldAlert className="w-3.5 h-3.5" />
@@ -375,9 +507,71 @@ export default function AdminPage() {
               </div>
             </div>
           </div>
+
         </div>
+
       </div>
+
+      {/* Modal Preview QR Code Satuan */}
+      {previewCard && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full text-center shadow-2xl border border-gray-100 relative">
+            
+            <button
+              onClick={() => setPreviewCard(null)}
+              className="absolute top-4 right-4 p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="mb-3">
+              <span className="text-[11px] font-mono font-semibold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700">
+                #{previewCard.short_code}
+              </span>
+              <h3 className="text-base font-bold text-gray-900 mt-2">
+                QR Code Kartu
+              </h3>
+              <p className="text-xs text-gray-500 mt-0.5">
+                {previewCard.business_name || 'Kartu Belum Diklaim (Ready Stock)'}
+              </p>
+            </div>
+
+            {/* Gambar QR Code */}
+            {previewQrDataUrl && (
+              <div className="p-3 bg-gray-50 rounded-2xl border border-gray-100 inline-block my-2">
+                <img
+                  src={previewQrDataUrl}
+                  alt={`QR Code ${previewCard.short_code}`}
+                  className="w-48 h-48 mx-auto"
+                />
+              </div>
+            )}
+
+            <div className="text-[11px] font-mono text-gray-500 break-all px-2 mb-4">
+              {window.location.origin}/c/{previewCard.short_code}
+            </div>
+
+            <div className="flex gap-2">
+              <a
+                href={previewQrDataUrl}
+                download={`QR_${previewCard.short_code}.png`}
+                className="flex-1 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold transition flex items-center justify-center gap-1.5"
+              >
+                <Download className="w-3.5 h-3.5" /> Unduh Gambar PNG
+              </a>
+              <button
+                type="button"
+                onClick={() => setPreviewCard(null)}
+                className="py-2.5 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-semibold transition"
+              >
+                Tutup
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
-

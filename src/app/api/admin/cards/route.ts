@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase, getAdminSupabase } from '@/lib/supabase';
+import { getAdminSupabase } from '@/lib/supabase';
+import { devCardsStore } from '@/lib/dev-store';
+import type { Card } from '@/lib/types';
 
 export async function GET(req: NextRequest) {
+  let dbError: string | null = null;
+
   try {
     const adminClient = getAdminSupabase();
     const { data: cards, error } = await adminClient
@@ -9,16 +13,29 @@ export async function GET(req: NextRequest) {
       .select('*')
       .order('created_at', { ascending: false });
 
-    if (cards && cards.length > 0) {
-      return NextResponse.json({ cards });
+    if (error) {
+      dbError = error.message;
+    } else if (cards) {
+      return NextResponse.json({ 
+        cards, 
+        source: 'supabase',
+        total: cards.length 
+      });
     }
-  } catch (err) {
-    console.warn('Supabase fetch failed, fallback to dev store:', err);
+  } catch (err: any) {
+    dbError = err.message;
   }
 
-  // Fallback Dev Store
-  const devCards = Array.from(global.__DEV_CARDS_STORE__?.values() || []);
-  return NextResponse.json({ cards: devCards });
+  const devCards = Array.from(devCardsStore?.values() || []);
+  return NextResponse.json({ 
+    cards: devCards, 
+    source: 'dev_store',
+    supabase_error: dbError,
+    supabase_configured: Boolean(
+      process.env.NEXT_PUBLIC_SUPABASE_URL && 
+      !process.env.NEXT_PUBLIC_SUPABASE_URL.includes('demo.supabase.co')
+    )
+  });
 }
 
 // Generate Batch Kartu Baru
@@ -26,45 +43,51 @@ export async function POST(req: NextRequest) {
   try {
     const { count = 10, prefix = 'DW', batch_name = 'BATCH-01' } = await req.json();
 
-    const newCards: any[] = [];
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const newCards: Card[] = [];
+    const now = new Date().toISOString();
 
     for (let i = 1; i <= Number(count); i++) {
-      // Format serial unik pendek, misal: DW-8921 atau kode berurutan
       const randomStr = Math.random().toString(36).substring(2, 6).toUpperCase();
       const short_code = `${prefix}${randomStr}`;
 
       newCards.push({
+        id: `card-${short_code}`,
         short_code,
         status: 'unclaimed',
+        mode: 'smart_hub',
         batch_number: batch_name,
         tap_count: 0,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        created_at: now,
+        updated_at: now,
       });
     }
 
-    // Coba insert ke Supabase
+    // Coba simpan ke Supabase
     try {
       const adminClient = getAdminSupabase();
       const { data, error } = await adminClient.from('cards').insert(newCards).select();
       if (data) {
-        return NextResponse.json({ success: true, count: data.length, cards: data });
+        return NextResponse.json({ success: true, count: data.length, cards: data, source: 'supabase' });
+      }
+      if (error) {
+        console.error('Supabase batch insert error:', error);
       }
     } catch (dbErr) {
-      console.warn('Supabase insert failed, storing to dev store:', dbErr);
+      // Abaikan jika Supabase offline
     }
 
     // Dev Store Fallback
-    for (const c of newCards) {
-      global.__DEV_CARDS_STORE__?.set(c.short_code, { ...c, id: `card-${c.short_code}` });
+    if (devCardsStore) {
+      for (const c of newCards) {
+        devCardsStore.set(c.short_code, c);
+      }
     }
 
     return NextResponse.json({
       success: true,
       count: newCards.length,
       cards: newCards,
-      note: 'Stored in development memory store',
+      note: 'Tersimpan dalam memory store pengembangan',
     });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
@@ -76,27 +99,41 @@ export async function PUT(req: NextRequest) {
   try {
     const { short_code } = await req.json();
     if (!short_code) {
-      return NextResponse.json({ error: 'short_code is required' }, { status: 400 });
+      return NextResponse.json({ error: 'short_code wajib diisi' }, { status: 400 });
     }
 
     const normalizedCode = short_code.toUpperCase();
+    const now = new Date().toISOString();
+
+    const resetPayload = {
+      status: 'unclaimed' as const,
+      mode: 'smart_hub' as const,
+      business_name: null,
+      business_category: null,
+      business_address: null,
+      google_place_id: null,
+      review_url: null,
+      owner_phone: null,
+      owner_email: null,
+      owner_id: null,
+      wifi_ssid: null,
+      wifi_password: null,
+      menu_url: null,
+      services_url: null,
+      instagram_username: null,
+      tiktok_username: null,
+      website_url: null,
+      whatsapp_number: null,
+      claimed_at: null,
+      updated_at: now,
+    };
 
     // Reset di Supabase
     try {
       const adminClient = getAdminSupabase();
       const { data, error } = await adminClient
         .from('cards')
-        .update({
-          status: 'unclaimed',
-          business_name: null,
-          business_address: null,
-          google_place_id: null,
-          review_url: null,
-          owner_phone: null,
-          owner_id: null,
-          claimed_at: null,
-          updated_at: new Date().toISOString(),
-        })
+        .update(resetPayload)
         .eq('short_code', normalizedCode)
         .select()
         .single();
@@ -105,20 +142,20 @@ export async function PUT(req: NextRequest) {
         return NextResponse.json({ success: true, card: data });
       }
     } catch (dbErr) {
-      console.warn('Supabase reset failed, updating dev store:', dbErr);
+      // Abaikan jika Supabase offline
     }
 
     // Reset di Dev Store
-    const devCard = global.__DEV_CARDS_STORE__?.get(normalizedCode);
-    if (devCard) {
-      devCard.status = 'unclaimed';
-      devCard.business_name = null;
-      devCard.business_address = null;
-      devCard.google_place_id = null;
-      devCard.review_url = null;
-      devCard.owner_phone = null;
-      devCard.claimed_at = null;
-      return NextResponse.json({ success: true, card: devCard });
+    if (devCardsStore) {
+      const devCard = devCardsStore.get(normalizedCode);
+      if (devCard) {
+        const merged: Card = {
+          ...devCard,
+          ...resetPayload,
+        };
+        devCardsStore.set(normalizedCode, merged);
+        return NextResponse.json({ success: true, card: merged });
+      }
     }
 
     return NextResponse.json({ error: 'Kartu tidak ditemukan' }, { status: 404 });
@@ -126,4 +163,3 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
-

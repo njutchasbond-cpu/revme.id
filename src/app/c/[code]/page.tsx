@@ -1,0 +1,111 @@
+import { redirect } from 'next/navigation';
+import { getAdminSupabase } from '@/lib/supabase';
+import { devCardsStore } from '@/lib/dev-store';
+import SmartHubClient from './SmartHubClient';
+import type { Card } from '@/lib/types';
+import { AlertCircle } from 'lucide-react';
+
+export const dynamic = 'force-dynamic';
+
+interface PageProps {
+  params: Promise<{ code: string }>;
+}
+
+export default async function CardAccessPage({ params }: PageProps) {
+  const { code } = await params;
+  const shortCode = code.toUpperCase();
+
+  let card: Card | null = null;
+
+  // 1. Coba cari di Supabase menggunakan Admin Client (Bypass RLS untuk pembacaan akurat)
+  try {
+    const adminClient = getAdminSupabase();
+    const { data, error } = await adminClient
+      .from('cards')
+      .select('*')
+      .eq('short_code', shortCode)
+      .maybeSingle();
+
+    if (data && !error) {
+      card = data as Card;
+    }
+  } catch (err) {
+    // Fallback ke dev store jika Supabase offline
+  }
+
+  // 2. Fallback ke dev store lokal jika tidak ditemukan di Supabase
+  if (!card && devCardsStore) {
+    card = devCardsStore.get(shortCode) || null;
+  }
+
+  // Jika kartu belum terdaftar sama sekali
+  if (!card) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4">
+        <div className="max-w-sm w-full bg-slate-900 border border-slate-800 rounded-2xl p-6 text-center space-y-4">
+          <div className="w-12 h-12 rounded-full bg-rose-500/10 text-rose-400 mx-auto flex items-center justify-center border border-rose-500/20">
+            <AlertCircle className="w-6 h-6" />
+          </div>
+          <h1 className="text-lg font-bold text-white">Kartu Tidak Dikenal</h1>
+          <p className="text-xs text-slate-400">
+            Kode kartu <span className="font-mono text-slate-200 font-semibold">{shortCode}</span> belum terdaftar dalam sistem.
+          </p>
+          <a
+            href="/"
+            className="inline-block px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs text-slate-200 font-medium rounded-xl transition"
+          >
+            Kembali ke Beranda
+          </a>
+        </div>
+      </div>
+    );
+  }
+
+  // Skenario A: Kartu belum diklaim (First-Tap Claim)
+  if (card.status === 'unclaimed') {
+    redirect(`/claim/${shortCode}`);
+  }
+
+  // Skenario B: Kartu dinonaktifkan
+  if (card.status === 'inactive') {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4">
+        <div className="max-w-sm w-full bg-slate-900 border border-slate-800 rounded-2xl p-6 text-center space-y-3">
+          <div className="w-12 h-12 rounded-full bg-amber-500/10 text-amber-400 mx-auto flex items-center justify-center border border-amber-500/20">
+            <AlertCircle className="w-6 h-6" />
+          </div>
+          <h1 className="text-lg font-bold text-white">Kartu Nonaktif</h1>
+          <p className="text-xs text-slate-400">
+            Kartu ini sedang dinonaktifkan sementara oleh pemilik bisnis.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Skenario C: Kartu Aktif - Catat tap log secara background
+  try {
+    const adminClient = getAdminSupabase();
+    await adminClient.from('interaction_logs').insert({
+      card_id: card.id,
+      interaction_type: 'card_tap',
+    });
+    await adminClient
+      .from('cards')
+      .update({ tap_count: (card.tap_count || 0) + 1 })
+      .eq('id', card.id);
+  } catch (logErr) {
+    if (devCardsStore?.has(shortCode)) {
+      const devItem = devCardsStore.get(shortCode)!;
+      devItem.tap_count = (devItem.tap_count || 0) + 1;
+    }
+  }
+
+  // Jika mode Direct Review aktif dan link ulasan tersedia
+  if (card.mode === 'direct_review' && card.review_url) {
+    redirect(card.review_url);
+  }
+
+  // Jika mode Smart Hub aktif, tampilkan portal All-in-One
+  return <SmartHubClient card={card} />;
+}

@@ -208,7 +208,4 @@ CREATE INDEX idx_tap_logs_created_at ON tap_logs(created_at);
 - [ ] Dashboard analitik untuk merchant (total tap, perbandingan mingguan).
 - [ ] Notifikasi ringkasan mingguan via WhatsApp ke merchant.
 
-### Fase 3: Integrasi Ekosistem POS Studio FnB
-- [ ] Single Sign-On (SSO) dengan akun merchant POS Studio FnB/Kalcer.
-- [ ] Fitur *Upselling*: Menambahkan kartu ulasan langsung dari dalam aplikasi kasir POS Studio.
 
