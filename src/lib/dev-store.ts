@@ -38,6 +38,8 @@ if (!global.__DEV_CARDS_STORE__) {
         tiktok_username: 'alonewear.co',
         website_url: 'https://example.com',
         whatsapp_number: '6282278281649',
+        shopee_url: 'https://shopee.co.id/alone_wear.co',
+        tokopedia_url: 'https://tokopedia.com/alonewear',
         theme_preset: 'emerald',
         tap_count: 38,
         claimed_at: new Date().toISOString(),

@@ -50,6 +50,10 @@ export default function ClaimPage({ params }: { params: Promise<{ code: string }
   const [instagram, setInstagram] = useState('');
   const [tiktok, setTiktok] = useState('');
   const [websiteUrl, setWebsiteUrl] = useState('');
+  const [shopeeUrl, setShopeeUrl] = useState('');
+  const [tokopediaUrl, setTokopediaUrl] = useState('');
+  const [shopeeFoodUrl, setShopeeFoodUrl] = useState('');
+  const [goFoodUrl, setGoFoodUrl] = useState('');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isClaimed, setIsClaimed] = useState(false);
@@ -129,6 +133,10 @@ export default function ClaimPage({ params }: { params: Promise<{ code: string }
           tiktok_username: tiktok,
           website_url: websiteUrl,
           whatsapp_number: phone,
+          shopee_url: shopeeUrl,
+          tokopedia_url: tokopediaUrl,
+          shopeefood_url: shopeeFoodUrl,
+          gofood_url: goFoodUrl,
         }),
       });
 
@@ -486,6 +494,54 @@ export default function ClaimPage({ params }: { params: Promise<{ code: string }
                           placeholder="https://namatoko.com"
                           className="w-full px-3 py-2 text-xs bg-slate-900 border border-slate-800 rounded-lg text-white placeholder:text-slate-600 outline-none focus:border-blue-500"
                         />
+                      </div>
+
+                      {/* Marketplace: Shopee & Tokopedia */}
+                      <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-800/60">
+                        <div>
+                          <label className="block text-[11px] text-slate-400 mb-1">Link Toko Shopee</label>
+                          <input
+                            type="text"
+                            value={shopeeUrl}
+                            onChange={(e) => setShopeeUrl(e.target.value)}
+                            placeholder="https://shopee.co.id/namatoko"
+                            className="w-full px-3 py-2 text-xs bg-slate-900 border border-slate-800 rounded-lg text-white placeholder:text-slate-600 outline-none focus:border-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] text-slate-400 mb-1">Link Toko Tokopedia</label>
+                          <input
+                            type="text"
+                            value={tokopediaUrl}
+                            onChange={(e) => setTokopediaUrl(e.target.value)}
+                            placeholder="https://tokopedia.com/namatoko"
+                            className="w-full px-3 py-2 text-xs bg-slate-900 border border-slate-800 rounded-lg text-white placeholder:text-slate-600 outline-none focus:border-blue-500"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Delivery: ShopeeFood & GoFood */}
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[11px] text-slate-400 mb-1">Link ShopeeFood</label>
+                          <input
+                            type="text"
+                            value={shopeeFoodUrl}
+                            onChange={(e) => setShopeeFoodUrl(e.target.value)}
+                            placeholder="https://shopeefood..."
+                            className="w-full px-3 py-2 text-xs bg-slate-900 border border-slate-800 rounded-lg text-white placeholder:text-slate-600 outline-none focus:border-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] text-slate-400 mb-1">Link GoFood</label>
+                          <input
+                            type="text"
+                            value={goFoodUrl}
+                            onChange={(e) => setGoFoodUrl(e.target.value)}
+                            placeholder="https://gofood..."
+                            className="w-full px-3 py-2 text-xs bg-slate-900 border border-slate-800 rounded-lg text-white placeholder:text-slate-600 outline-none focus:border-blue-500"
+                          />
+                        </div>
                       </div>
 
                     </div>

@@ -23,6 +23,10 @@ export async function POST(req: NextRequest) {
       tiktok_username,
       website_url,
       whatsapp_number,
+      shopee_url,
+      tokopedia_url,
+      shopeefood_url,
+      gofood_url,
     } = body;
 
     if (!short_code || !business_name || !google_place_id) {
@@ -55,6 +59,10 @@ export async function POST(req: NextRequest) {
       tiktok_username: tiktok_username || null,
       website_url: website_url || null,
       whatsapp_number: whatsapp_number || owner_phone || null,
+      shopee_url: shopee_url || null,
+      tokopedia_url: tokopedia_url || null,
+      shopeefood_url: shopeefood_url || null,
+      gofood_url: gofood_url || null,
       claimed_at: now,
       updated_at: now,
     };

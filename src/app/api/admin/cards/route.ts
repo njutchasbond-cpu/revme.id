@@ -124,6 +124,10 @@ export async function PUT(req: NextRequest) {
       tiktok_username: null,
       website_url: null,
       whatsapp_number: null,
+      shopee_url: null,
+      tokopedia_url: null,
+      shopeefood_url: null,
+      gofood_url: null,
       claimed_at: null,
       updated_at: now,
     };

@@ -27,6 +27,10 @@ export interface Card {
   tiktok_username?: string | null;
   website_url?: string | null;
   whatsapp_number?: string | null;
+  shopee_url?: string | null;
+  tokopedia_url?: string | null;
+  shopeefood_url?: string | null;
+  gofood_url?: string | null;
   theme_preset?: string | null;
   
   batch_number?: string | null;

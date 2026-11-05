@@ -13,7 +13,11 @@ import {
   Briefcase, 
   MapPin, 
   ExternalLink,
-  Share2
+  Share2,
+  ShoppingBag,
+  Store,
+  Utensils,
+  UtensilsCrossed
 } from 'lucide-react';
 import type { Card } from '@/lib/types';
 
@@ -310,6 +314,94 @@ export default function SmartHubClient({ card }: SmartHubClientProps) {
                 <div className="text-left">
                   <div className="text-sm font-semibold text-white">Kunjungi Situs Web</div>
                   <div className="text-xs text-slate-400 truncate max-w-[200px]">{card.website_url}</div>
+                </div>
+              </div>
+              <ExternalLink className="w-4 h-4 text-slate-500" />
+            </a>
+          )}
+
+          {/* Marketplace Shopee */}
+          {card.shopee_url && (
+            <a
+              href={card.shopee_url.startsWith('http') ? card.shopee_url : `https://${card.shopee_url}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => logInteraction('click_shopee')}
+              className="bg-slate-900/80 hover:bg-slate-800/80 border border-slate-800 rounded-xl p-3.5 flex items-center justify-between text-slate-200 transition active:scale-[0.99]"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-orange-500/10 text-orange-400 flex items-center justify-center border border-orange-500/20">
+                  <ShoppingBag className="w-4 h-4" />
+                </div>
+                <div className="text-left">
+                  <div className="text-sm font-semibold text-white">Shopee Official Store</div>
+                  <div className="text-xs text-slate-400">Belanja produk di Shopee</div>
+                </div>
+              </div>
+              <ExternalLink className="w-4 h-4 text-slate-500" />
+            </a>
+          )}
+
+          {/* Marketplace Tokopedia */}
+          {card.tokopedia_url && (
+            <a
+              href={card.tokopedia_url.startsWith('http') ? card.tokopedia_url : `https://${card.tokopedia_url}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => logInteraction('click_tokopedia')}
+              className="bg-slate-900/80 hover:bg-slate-800/80 border border-slate-800 rounded-xl p-3.5 flex items-center justify-between text-slate-200 transition active:scale-[0.99]"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center border border-emerald-500/20">
+                  <Store className="w-4 h-4" />
+                </div>
+                <div className="text-left">
+                  <div className="text-sm font-semibold text-white">Tokopedia Official Store</div>
+                  <div className="text-xs text-slate-400">Belanja produk di Tokopedia</div>
+                </div>
+              </div>
+              <ExternalLink className="w-4 h-4 text-slate-500" />
+            </a>
+          )}
+
+          {/* Delivery ShopeeFood */}
+          {card.shopeefood_url && (
+            <a
+              href={card.shopeefood_url.startsWith('http') ? card.shopeefood_url : `https://${card.shopeefood_url}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => logInteraction('click_shopeefood')}
+              className="bg-slate-900/80 hover:bg-slate-800/80 border border-slate-800 rounded-xl p-3.5 flex items-center justify-between text-slate-200 transition active:scale-[0.99]"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center border border-amber-500/20">
+                  <UtensilsCrossed className="w-4 h-4" />
+                </div>
+                <div className="text-left">
+                  <div className="text-sm font-semibold text-white">ShopeeFood</div>
+                  <div className="text-xs text-slate-400">Pesan antar makanan via ShopeeFood</div>
+                </div>
+              </div>
+              <ExternalLink className="w-4 h-4 text-slate-500" />
+            </a>
+          )}
+
+          {/* Delivery GoFood */}
+          {card.gofood_url && (
+            <a
+              href={card.gofood_url.startsWith('http') ? card.gofood_url : `https://${card.gofood_url}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => logInteraction('click_gofood')}
+              className="bg-slate-900/80 hover:bg-slate-800/80 border border-slate-800 rounded-xl p-3.5 flex items-center justify-between text-slate-200 transition active:scale-[0.99]"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-rose-500/10 text-rose-400 flex items-center justify-center border border-rose-500/20">
+                  <Utensils className="w-4 h-4" />
+                </div>
+                <div className="text-left">
+                  <div className="text-sm font-semibold text-white">GoFood</div>
+                  <div className="text-xs text-slate-400">Pesan antar makanan via GoFood</div>
                 </div>
               </div>
               <ExternalLink className="w-4 h-4 text-slate-500" />

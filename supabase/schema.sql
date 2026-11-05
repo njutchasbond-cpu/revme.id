@@ -42,6 +42,10 @@ CREATE TABLE IF NOT EXISTS public.cards (
     tiktok_username VARCHAR(100),
     website_url TEXT,
     whatsapp_number VARCHAR(30),
+    shopee_url TEXT,
+    tokopedia_url TEXT,
+    shopeefood_url TEXT,
+    gofood_url TEXT,
     theme_preset VARCHAR(50) DEFAULT 'default',
     
     -- Operasional Produksi & Statistik
@@ -98,3 +102,9 @@ CREATE POLICY "Owner can update own card" ON public.cards
 
 CREATE POLICY "Public can insert interaction logs" ON public.interaction_logs
     FOR INSERT WITH CHECK (true);
+
+-- Kolom tambahan untuk Marketplace & Delivery
+ALTER TABLE public.cards ADD COLUMN IF NOT EXISTS shopee_url TEXT;
+ALTER TABLE public.cards ADD COLUMN IF NOT EXISTS tokopedia_url TEXT;
+ALTER TABLE public.cards ADD COLUMN IF NOT EXISTS shopeefood_url TEXT;
+ALTER TABLE public.cards ADD COLUMN IF NOT EXISTS gofood_url TEXT;
