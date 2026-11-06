@@ -113,9 +113,9 @@ export async function PUT(req: NextRequest) {
     const normalizedCode = short_code.toUpperCase();
     const now = new Date().toISOString();
 
-    const resetPayload = {
-      status: 'unclaimed' as const,
-      mode: 'smart_hub' as const,
+    const resetPayload: any = {
+      status: 'unclaimed',
+      mode: 'smart_hub',
       business_name: null,
       business_category: null,
       business_address: null,
@@ -132,10 +132,6 @@ export async function PUT(req: NextRequest) {
       tiktok_username: null,
       website_url: null,
       whatsapp_number: null,
-      shopee_url: null,
-      tokopedia_url: null,
-      shopeefood_url: null,
-      gofood_url: null,
       claimed_at: null,
       updated_at: now,
     };
@@ -143,38 +139,24 @@ export async function PUT(req: NextRequest) {
     // Reset di Supabase
     try {
       const adminClient = getAdminSupabase();
-      let { data, error } = await adminClient
+      const { data, error } = await adminClient
         .from('cards')
         .update(resetPayload)
         .eq('short_code', normalizedCode)
         .select()
         .maybeSingle();
 
-      if (error && error.message.includes('does not exist')) {
-        // Fallback jika kolom marketplace belum dimigrasi di Supabase
-        const safeReset = { ...resetPayload };
-        delete (safeReset as any).shopee_url;
-        delete (safeReset as any).tokopedia_url;
-        delete (safeReset as any).shopeefood_url;
-        delete (safeReset as any).gofood_url;
-
-        const retry = await adminClient
-          .from('cards')
-          .update(safeReset)
-          .eq('short_code', normalizedCode)
-          .select()
-          .maybeSingle();
-
-        if (retry.data) {
-          return NextResponse.json({ success: true, card: retry.data });
-        }
+      if (error) {
+        console.error('Supabase reset error:', error);
+        return NextResponse.json({ error: error.message }, { status: 500 });
       }
 
       if (data) {
         return NextResponse.json({ success: true, card: data });
       }
-    } catch (dbErr) {
-      // Abaikan jika Supabase offline
+    } catch (dbErr: any) {
+      console.error('Database reset exception:', dbErr);
+      return NextResponse.json({ error: dbErr.message }, { status: 500 });
     }
 
     // Reset di Dev Store
@@ -232,7 +214,7 @@ export async function PATCH(req: NextRequest) {
         .select()
         .single();
 
-      if (error && error.message.includes('does not exist')) {
+      if (error && (error.message.includes('column') || error.message.includes('schema cache') || error.message.includes('does not exist'))) {
         const safePayload = { ...payloadToSave };
         delete (safePayload as any).shopee_url;
         delete (safePayload as any).tokopedia_url;

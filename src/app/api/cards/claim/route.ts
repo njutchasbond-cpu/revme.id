@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
         if (updatedCard) {
           return NextResponse.json({ success: true, card: updatedCard });
         }
-        if (updateErr && updateErr.message.includes('does not exist')) {
+        if (updateErr && (updateErr.message.includes('column') || updateErr.message.includes('schema cache') || updateErr.message.includes('does not exist'))) {
           const safeUpdate = { ...updatePayload };
           delete (safeUpdate as any).shopee_url;
           delete (safeUpdate as any).tokopedia_url;
@@ -127,7 +127,7 @@ export async function POST(req: NextRequest) {
         if (insertedCard) {
           return NextResponse.json({ success: true, card: insertedCard });
         }
-        if (insertErr && insertErr.message.includes('does not exist')) {
+        if (insertErr && (insertErr.message.includes('column') || insertErr.message.includes('schema cache') || insertErr.message.includes('does not exist'))) {
           const safeInsert = {
             short_code: normalizedCode,
             tap_count: 0,
