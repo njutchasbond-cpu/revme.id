@@ -93,6 +93,20 @@ export async function POST(req: NextRequest) {
         if (updatedCard) {
           return NextResponse.json({ success: true, card: updatedCard });
         }
+        if (updateErr && updateErr.message.includes('does not exist')) {
+          const safeUpdate = { ...updatePayload };
+          delete (safeUpdate as any).shopee_url;
+          delete (safeUpdate as any).tokopedia_url;
+          delete (safeUpdate as any).shopeefood_url;
+          delete (safeUpdate as any).gofood_url;
+          const retry = await adminClient
+            .from('cards')
+            .update(safeUpdate)
+            .eq('id', existingCard.id)
+            .select()
+            .maybeSingle();
+          if (retry.data) return NextResponse.json({ success: true, card: retry.data });
+        }
         if (updateErr) {
           console.error('Supabase update error:', updateErr);
         }
@@ -112,6 +126,24 @@ export async function POST(req: NextRequest) {
 
         if (insertedCard) {
           return NextResponse.json({ success: true, card: insertedCard });
+        }
+        if (insertErr && insertErr.message.includes('does not exist')) {
+          const safeInsert = {
+            short_code: normalizedCode,
+            tap_count: 0,
+            created_at: now,
+            ...updatePayload,
+          };
+          delete (safeInsert as any).shopee_url;
+          delete (safeInsert as any).tokopedia_url;
+          delete (safeInsert as any).shopeefood_url;
+          delete (safeInsert as any).gofood_url;
+          const retry = await adminClient
+            .from('cards')
+            .insert(safeInsert)
+            .select()
+            .maybeSingle();
+          if (retry.data) return NextResponse.json({ success: true, card: retry.data });
         }
         if (insertErr) {
           console.error('Supabase insert error:', insertErr);

@@ -143,12 +143,32 @@ export async function PUT(req: NextRequest) {
     // Reset di Supabase
     try {
       const adminClient = getAdminSupabase();
-      const { data, error } = await adminClient
+      let { data, error } = await adminClient
         .from('cards')
         .update(resetPayload)
         .eq('short_code', normalizedCode)
         .select()
-        .single();
+        .maybeSingle();
+
+      if (error && error.message.includes('does not exist')) {
+        // Fallback jika kolom marketplace belum dimigrasi di Supabase
+        const safeReset = { ...resetPayload };
+        delete (safeReset as any).shopee_url;
+        delete (safeReset as any).tokopedia_url;
+        delete (safeReset as any).shopeefood_url;
+        delete (safeReset as any).gofood_url;
+
+        const retry = await adminClient
+          .from('cards')
+          .update(safeReset)
+          .eq('short_code', normalizedCode)
+          .select()
+          .maybeSingle();
+
+        if (retry.data) {
+          return NextResponse.json({ success: true, card: retry.data });
+        }
+      }
 
       if (data) {
         return NextResponse.json({ success: true, card: data });
@@ -212,7 +232,24 @@ export async function PATCH(req: NextRequest) {
         .select()
         .single();
 
-      if (error) {
+      if (error && error.message.includes('does not exist')) {
+        const safePayload = { ...payloadToSave };
+        delete (safePayload as any).shopee_url;
+        delete (safePayload as any).tokopedia_url;
+        delete (safePayload as any).shopeefood_url;
+        delete (safePayload as any).gofood_url;
+
+        const retry = await adminClient
+          .from('cards')
+          .update(safePayload)
+          .eq('short_code', normalizedCode)
+          .select()
+          .maybeSingle();
+
+        if (retry.data) {
+          return NextResponse.json({ success: true, card: retry.data });
+        }
+      } else if (error) {
         console.error('Supabase update error:', error);
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
