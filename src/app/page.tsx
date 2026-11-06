@@ -285,84 +285,6 @@ export default function HomePage() {
               Gantikan tumpukan stiker QR di meja Anda. Satu kartu pintar untuk mendongkrak ulasan Google Maps bintang 5, membagikan kata sandi WiFi otomatis, membuka buku menu, marketplace, hingga media sosial.
             </p>
 
-            {/* Kotak Interaktif Out-of-the-Box: Ketik Nama Toko Anda */}
-            <div className="max-w-xl mx-auto pt-2">
-              <div className="bg-slate-900/90 border-2 border-blue-500/40 rounded-2xl p-3 sm:p-4 shadow-2xl shadow-blue-950/40 text-left relative">
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-[11px] font-bold uppercase tracking-wider text-blue-400 flex items-center gap-1.5">
-                    <Search className="w-3.5 h-3.5" /> Simulasi Gratis: Ketik Nama Usaha & Kota Anda (Indonesia)
-                  </label>
-                  <span className="text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
-                    Wilayah Indonesia
-                  </span>
-                </div>
-
-                <div className="relative flex gap-2">
-                  <input
-                    type="text"
-                    value={brandSearch}
-                    onChange={(e) => handleManualBrandTyping(e.target.value)}
-                    onFocus={() => predictions.length > 0 && setShowDropdown(true)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        setShowDropdown(false);
-                      }
-                    }}
-                    placeholder="Contoh: Kopi Senja Jakarta, AWB Pringsewu, Salon Cantika..."
-                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 focus:border-blue-500 rounded-xl text-sm text-white placeholder:text-slate-500 outline-none transition"
-                  />
-                  {brandSearch && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setBrandSearch('');
-                        handleManualBrandTyping('');
-                        setPredictions([]);
-                        setShowDropdown(false);
-                      }}
-                      className="px-3 text-xs text-slate-400 hover:text-white bg-slate-800 rounded-xl transition"
-                    >
-                      Reset
-                    </button>
-                  )}
-                </div>
-
-                {/* Dropdown Hasil Pencarian Google Maps / Lokasi */}
-                {showDropdown && predictions.length > 0 && (
-                  <div className="absolute left-0 right-0 top-full mt-2 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden z-30 max-h-60 overflow-y-auto divide-y divide-slate-800/80">
-                    {predictions.map((item) => (
-                      <button
-                        key={item.place_id}
-                        type="button"
-                        onClick={() => handleSelectPrediction(item)}
-                        className="w-full text-left px-4 py-3 hover:bg-slate-800/90 transition flex items-start gap-2.5"
-                      >
-                        <MapPin className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
-                        <div className="min-w-0">
-                          <div className="text-xs font-bold text-white truncate">
-                            {item.main_text}
-                          </div>
-                          <div className="text-[11px] text-slate-400 truncate">
-                            {item.secondary_text}
-                          </div>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                <div className="mt-2 flex items-center justify-between text-[11px] text-slate-400">
-                  <span>
-                    Lihat kartu fisik & layar HP di bawah langsung berubah mengikuti nama bisnis Anda.
-                  </span>
-                  {isSearchingPlace && (
-                    <span className="text-blue-400 font-medium">Mencari lokasi...</span>
-                  )}
-                </div>
-              </div>
-            </div>
-
             {/* Dual Hero CTA Buttons */}
             <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
               <a
@@ -371,9 +293,7 @@ export default function HomePage() {
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs sm:text-sm shadow-xl shadow-blue-600/30 transition transform hover:-translate-y-0.5"
               >
-                <span>
-                  Pesan Kartu untuk &ldquo;{previewBrandName.slice(0, 24)}&rdquo;
-                </span>
+                <span>Pesan Kartu Pintar Sekarang</span>
                 <ArrowRight className="w-4 h-4" />
               </a>
 
