@@ -133,12 +133,6 @@ export default function HomePage() {
             >
               <Star className="w-4 h-4 fill-emerald-400" /> 3. Mode Direct Google Review
             </Link>
-            <Link
-              href="/admin"
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800 font-semibold text-xs transition"
-            >
-              <Settings className="w-4 h-4" /> 4. Super Admin Generator
-            </Link>
           </div>
         </div>
 

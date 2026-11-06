@@ -2,10 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAdminSupabase } from '@/lib/supabase';
 import { devCardsStore } from '@/lib/dev-store';
 import type { Card } from '@/lib/types';
+import { verifyAdminAccess } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
+  if (!verifyAdminAccess(req)) {
+    return NextResponse.json(
+      { error: 'Akses ditolak: ADMIN_SECRET_KEY tidak valid.' },
+      { status: 401 }
+    );
+  }
+
   let dbError: string | null = null;
 
   try {
@@ -42,6 +50,13 @@ export async function GET(req: NextRequest) {
 
 // Generate Batch Kartu Baru
 export async function POST(req: NextRequest) {
+  if (!verifyAdminAccess(req)) {
+    return NextResponse.json(
+      { error: 'Akses ditolak: ADMIN_SECRET_KEY tidak valid.' },
+      { status: 401 }
+    );
+  }
+
   try {
     const { count = 10, prefix = 'DW', batch_name = 'BATCH-01' } = await req.json();
 
@@ -104,6 +119,13 @@ export async function POST(req: NextRequest) {
 
 // Reset Kartu (Force Reset to Unclaimed)
 export async function PUT(req: NextRequest) {
+  if (!verifyAdminAccess(req)) {
+    return NextResponse.json(
+      { error: 'Akses ditolak: ADMIN_SECRET_KEY tidak valid.' },
+      { status: 401 }
+    );
+  }
+
   try {
     const { short_code } = await req.json();
     if (!short_code) {
@@ -180,6 +202,13 @@ export async function PUT(req: NextRequest) {
 
 // Update / Edit Data Kartu dari Admin
 export async function PATCH(req: NextRequest) {
+  if (!verifyAdminAccess(req)) {
+    return NextResponse.json(
+      { error: 'Akses ditolak: ADMIN_SECRET_KEY tidak valid.' },
+      { status: 401 }
+    );
+  }
+
   try {
     const body = await req.json();
     const { short_code, ...updateFields } = body;

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import QRCode from 'qrcode';
 import JSZip from 'jszip';
 import {
@@ -17,11 +18,24 @@ import {
   X,
   FileArchive,
   Pencil,
-  RotateCcw
+  RotateCcw,
+  Lock,
+  KeyRound,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import type { Card } from '@/lib/types';
 
 export default function AdminPage() {
+  // Auth State
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [adminSecret, setAdminSecret] = useState('');
+  const [inputKey, setInputKey] = useState('');
+  const [showSecret, setShowSecret] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
+
   const [cards, setCards] = useState<Card[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -46,10 +60,22 @@ export default function AdminPage() {
   const [previewCard, setPreviewCard] = useState<Card | null>(null);
   const [previewQrDataUrl, setPreviewQrDataUrl] = useState<string>('');
 
-  const fetchCards = async () => {
+  const fetchCards = async (activeSecret?: string) => {
     setIsLoading(true);
+    const keyToUse = activeSecret !== undefined ? activeSecret : adminSecret;
+
     try {
-      const res = await fetch(`/api/admin/cards?t=${Date.now()}`, { cache: 'no-store' });
+      const res = await fetch(`/api/admin/cards?t=${Date.now()}`, {
+        headers: { 'x-admin-key': keyToUse },
+        cache: 'no-store',
+      });
+
+      if (res.status === 401) {
+        handleLockPortal();
+        setAuthError('Sesi berakhir atau kunci rahasia tidak valid. Silakan login kembali.');
+        return;
+      }
+
       const data = await res.json();
       if (data.cards) {
         setCards(data.cards);
@@ -61,9 +87,84 @@ export default function AdminPage() {
     }
   };
 
+  // Cek status autentikasi saat pertama kali dimuat
   useEffect(() => {
-    fetchCards();
+    const checkAuth = async () => {
+      setIsCheckingAuth(true);
+      try {
+        const savedKey = typeof window !== 'undefined' ? sessionStorage.getItem('admin_secret_key') : null;
+        if (savedKey) {
+          const res = await fetch('/api/admin/auth', {
+            headers: { 'x-admin-key': savedKey },
+            cache: 'no-store',
+          });
+          const data = await res.json();
+          if (data.authenticated) {
+            setAdminSecret(savedKey);
+            setIsAuthenticated(true);
+            fetchCards(savedKey);
+            return;
+          }
+        }
+      } catch (err) {
+        console.error('Check auth error:', err);
+      } finally {
+        setIsCheckingAuth(false);
+      }
+      setIsAuthenticated(false);
+      setIsLoading(false);
+    };
+
+    checkAuth();
   }, []);
+
+  const handleAuthSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inputKey.trim()) return;
+
+    setIsAuthenticating(true);
+    setAuthError(null);
+
+    try {
+      const res = await fetch('/api/admin/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: inputKey.trim() }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Kunci rahasia admin tidak sesuai.');
+      }
+
+      const validatedKey = inputKey.trim();
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('admin_secret_key', validatedKey);
+      }
+      setAdminSecret(validatedKey);
+      setIsAuthenticated(true);
+      setInputKey('');
+      await fetchCards(validatedKey);
+    } catch (err: any) {
+      setAuthError(err.message || 'Gagal memverifikasi kunci rahasia.');
+    } finally {
+      setIsAuthenticating(false);
+    }
+  };
+
+  const handleLockPortal = async () => {
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('admin_secret_key');
+    }
+    setAdminSecret('');
+    setIsAuthenticated(false);
+    setCards([]);
+    try {
+      await fetch('/api/admin/auth', { method: 'DELETE' });
+    } catch (err) {
+      console.error('Logout error:', err);
+    }
+  };
 
   const handleGenerateBatch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,13 +174,22 @@ export default function AdminPage() {
     try {
       const res = await fetch('/api/admin/cards', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-key': adminSecret,
+        },
         body: JSON.stringify({
           count: batchCount,
           prefix,
           batch_name: batchName,
         }),
       });
+
+      if (res.status === 401) {
+        handleLockPortal();
+        setAuthError('Sesi Anda berakhir. Masukkan kembali ADMIN_SECRET_KEY.');
+        return;
+      }
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Gagal generate kartu.');
@@ -101,9 +211,19 @@ export default function AdminPage() {
     try {
       const res = await fetch('/api/admin/cards', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-key': adminSecret,
+        },
         body: JSON.stringify({ short_code }),
       });
+
+      if (res.status === 401) {
+        handleLockPortal();
+        setAuthError('Sesi Anda berakhir. Masukkan kembali ADMIN_SECRET_KEY.');
+        return;
+      }
+
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Gagal reset kartu');
 
@@ -126,9 +246,18 @@ export default function AdminPage() {
     try {
       const res = await fetch('/api/admin/cards', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-key': adminSecret,
+        },
         body: JSON.stringify(editingCard),
       });
+
+      if (res.status === 401) {
+        handleLockPortal();
+        setAuthError('Sesi Anda berakhir. Masukkan kembali ADMIN_SECRET_KEY.');
+        return;
+      }
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Gagal menyimpan perubahan.');
@@ -256,6 +385,102 @@ export default function AdminPage() {
   const unclaimedCards = cards.filter((c) => c.status === 'unclaimed').length;
   const totalTaps = cards.reduce((sum, c) => sum + (c.tap_count || 0), 0);
 
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+        <div className="text-center space-y-3">
+          <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-xs font-semibold text-slate-400">Memeriksa otorisasi Super Admin...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4">
+        <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-2xl space-y-6">
+          <div className="text-center space-y-2">
+            <div className="w-12 h-12 bg-blue-500/10 border border-blue-500/20 text-blue-400 rounded-2xl flex items-center justify-center mx-auto shadow-inner">
+              <Lock className="w-6 h-6" />
+            </div>
+            <span className="inline-block px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[10px] font-bold uppercase tracking-wider">
+              Area Terbatas Super Admin
+            </span>
+            <h1 className="text-xl font-black text-white tracking-tight">Portal Super Admin Terkunci</h1>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Portal ini dilindungi dengan sistem keamanan kunci rahasia. Masukkan <code className="text-blue-400 font-mono">ADMIN_SECRET_KEY</code> untuk mengakses pengelolaan kartu.
+            </p>
+          </div>
+
+          <form onSubmit={handleAuthSubmit} className="space-y-4">
+            <div>
+              <label className="text-xs font-semibold text-slate-300 block mb-1.5">
+                Kunci Rahasia Admin
+              </label>
+              <div className="relative">
+                <input
+                  type={showSecret ? 'text' : 'password'}
+                  value={inputKey}
+                  onChange={(e) => {
+                    setInputKey(e.target.value);
+                    setAuthError(null);
+                  }}
+                  placeholder="Masukkan ADMIN_SECRET_KEY"
+                  className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl text-sm text-white placeholder:text-slate-600 outline-none pr-10 font-mono transition"
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowSecret(!showSecret)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition"
+                  title={showSecret ? 'Sembunyikan' : 'Tampilkan'}
+                >
+                  {showSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            {authError && (
+              <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{authError}</span>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={isAuthenticating || !inputKey.trim()}
+              className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-900/50 disabled:text-slate-500 text-white font-semibold text-xs rounded-xl shadow-lg shadow-blue-600/20 transition flex items-center justify-center gap-2"
+            >
+              {isAuthenticating ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Memvalidasi Kunci...
+                </>
+              ) : (
+                <>
+                  <KeyRound className="w-3.5 h-3.5" /> Buka Kunci Portal
+                </>
+              )}
+            </button>
+          </form>
+
+          <div className="pt-4 border-t border-slate-800/80 text-center space-y-2">
+            <Link
+              href="/"
+              className="text-xs text-slate-400 hover:text-white transition inline-flex items-center gap-1"
+            >
+              Kembali ke Beranda
+            </Link>
+            <div className="text-[10px] text-slate-600">
+              Diberdayakan oleh studiokalcer.com
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 p-4 sm:p-8">
       <div className="max-w-6xl mx-auto space-y-6">
@@ -311,11 +536,20 @@ export default function AdminPage() {
 
             {/* Tombol Refresh */}
             <button
-              onClick={fetchCards}
+              onClick={() => fetchCards()}
               className="p-2.5 border border-gray-200 hover:bg-gray-100 rounded-xl transition-all"
               title="Refresh Data"
             >
               <RefreshCw className="w-4 h-4 text-gray-600" />
+            </button>
+
+            {/* Tombol Kunci Portal (Logout) */}
+            <button
+              onClick={handleLockPortal}
+              className="p-2.5 border border-red-200 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl transition-all"
+              title="Kunci Portal Admin (Keluar)"
+            >
+              <Lock className="w-4 h-4" />
             </button>
           </div>
         </div>
