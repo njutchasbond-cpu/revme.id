@@ -115,7 +115,7 @@ export default function HomePage() {
           </div>
           <div className="flex flex-wrap items-center justify-center gap-3">
             <Link
-              href="/c/DEMO1"
+              href="/claim/DEMO1"
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:bg-amber-500/20 font-semibold text-xs transition"
             >
               <Sparkles className="w-4 h-4" /> 1. Uji First-Tap Claim (Kartu Baru)

@@ -10,7 +10,7 @@ if (!global.__DEV_CARDS_STORE__) {
       'DEMO1',
       {
         id: 'mock-1',
-        short_code: 'DEMO11',
+        short_code: 'DEMO1',
         status: 'unclaimed',
         mode: 'smart_hub',
         tap_count: 0,

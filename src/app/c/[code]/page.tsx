@@ -17,23 +17,31 @@ export default async function CardAccessPage({ params }: PageProps) {
 
   let card: Card | null = null;
 
-  // 1. Coba cari di Supabase menggunakan Admin Client (Bypass RLS untuk pembacaan akurat)
-  try {
-    const adminClient = getAdminSupabase();
-    const { data, error } = await adminClient
-      .from('cards')
-      .select('*')
-      .eq('short_code', shortCode)
-      .maybeSingle();
-
-    if (data && !error) {
-      card = data as Card;
-    }
-  } catch (err) {
-    // Fallback ke dev store jika Supabase offline
+  // 1. Fast-path untuk kartu demo simulasi (AKTIF1 & DIRECT1) agar render instan tanpa latensi DB
+  const isDemoCard = shortCode === 'AKTIF1' || shortCode === 'DIRECT1';
+  if (isDemoCard && devCardsStore?.has(shortCode)) {
+    card = devCardsStore.get(shortCode) || null;
   }
 
-  // 2. Fallback ke dev store lokal jika tidak ditemukan di Supabase
+  // 2. Coba cari di Supabase menggunakan Admin Client (Bypass RLS untuk pembacaan akurat)
+  if (!card) {
+    try {
+      const adminClient = getAdminSupabase();
+      const { data, error } = await adminClient
+        .from('cards')
+        .select('*')
+        .eq('short_code', shortCode)
+        .maybeSingle();
+
+      if (data && !error) {
+        card = data as Card;
+      }
+    } catch (err) {
+      // Fallback ke dev store jika Supabase offline
+    }
+  }
+
+  // 3. Fallback ke dev store lokal jika tidak ditemukan di Supabase
   if (!card && devCardsStore) {
     card = devCardsStore.get(shortCode) || null;
   }
@@ -83,22 +91,24 @@ export default async function CardAccessPage({ params }: PageProps) {
     );
   }
 
-  // Skenario C: Kartu Aktif - Catat tap log secara background
-  try {
-    const adminClient = getAdminSupabase();
-    await adminClient.from('interaction_logs').insert({
-      card_id: card.id,
-      interaction_type: 'card_tap',
-    });
-    await adminClient
-      .from('cards')
-      .update({ tap_count: (card.tap_count || 0) + 1 })
-      .eq('id', card.id);
-  } catch (logErr) {
-    if (devCardsStore?.has(shortCode)) {
-      const devItem = devCardsStore.get(shortCode)!;
-      devItem.tap_count = (devItem.tap_count || 0) + 1;
-    }
+  // Skenario C: Kartu Aktif - Catat tap log secara background asinkron (tidak memblokir redirect/render)
+  if (card.id && !card.id.startsWith('mock-')) {
+    try {
+      const adminClient = getAdminSupabase();
+      Promise.allSettled([
+        adminClient.from('interaction_logs').insert({
+          card_id: card.id,
+          interaction_type: 'card_tap',
+        }),
+        adminClient
+          .from('cards')
+          .update({ tap_count: (card.tap_count || 0) + 1 })
+          .eq('id', card.id),
+      ]).catch(() => {});
+    } catch (e) {}
+  } else if (devCardsStore?.has(shortCode)) {
+    const devItem = devCardsStore.get(shortCode)!;
+    devItem.tap_count = (devItem.tap_count || 0) + 1;
   }
 
   // Jika mode Direct Review aktif dan link ulasan tersedia
