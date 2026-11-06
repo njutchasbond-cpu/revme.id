@@ -5,7 +5,6 @@ import {
   Search, 
   MapPin, 
   CheckCircle, 
-  Sparkles, 
   AlertCircle, 
   ArrowRight, 
   Star, 
@@ -17,9 +16,13 @@ import {
   Briefcase,
   Layers,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Image as ImageIcon,
+  Upload,
+  Trash2
 } from 'lucide-react';
 import type { PlacePrediction, CardMode } from '@/lib/types';
+import { compressAndResizeImage } from '@/lib/image-utils';
 
 export default function ClaimPage({ params }: { params: Promise<{ code: string }> }) {
   const resolvedParams = use(params);
@@ -39,6 +42,10 @@ export default function ClaimPage({ params }: { params: Promise<{ code: string }
   // Form Fields
   const [phone, setPhone] = useState('');
   const [category, setCategory] = useState('');
+  const [customReviewUrl, setCustomReviewUrl] = useState('');
+  const [logoUrl, setLogoUrl] = useState('');
+  const [bannerUrl, setBannerUrl] = useState('');
+  const [isProcessingImage, setIsProcessingImage] = useState(false);
   const [mode, setMode] = useState<CardMode>('smart_hub');
   const [showAdvanced, setShowAdvanced] = useState(false);
 
@@ -99,6 +106,38 @@ export default function ClaimPage({ params }: { params: Promise<{ code: string }
     setPredictions([]);
   };
 
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsProcessingImage(true);
+    setErrorMsg('');
+    try {
+      const compressed = await compressAndResizeImage(file, 256, 256, 0.85);
+      setLogoUrl(compressed);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Gagal memproses gambar logo.');
+    } finally {
+      setIsProcessingImage(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleBannerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsProcessingImage(true);
+    setErrorMsg('');
+    try {
+      const compressed = await compressAndResizeImage(file, 960, 360, 0.82);
+      setBannerUrl(compressed);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Gagal memproses gambar banner.');
+    } finally {
+      setIsProcessingImage(false);
+      e.target.value = '';
+    }
+  };
+
   const handleSubmitClaim = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedPlace) {
@@ -122,7 +161,10 @@ export default function ClaimPage({ params }: { params: Promise<{ code: string }
           business_name: selectedPlace.name,
           business_category: category,
           business_address: placeAddress.trim() || selectedPlace.address || null,
+          logo_url: logoUrl || null,
+          banner_url: bannerUrl || null,
           google_place_id: selectedPlace.place_id,
+          review_url: customReviewUrl.trim() || null,
           owner_phone: phone,
           mode,
           wifi_ssid: wifiSsid,
@@ -160,7 +202,7 @@ export default function ClaimPage({ params }: { params: Promise<{ code: string }
         {/* Header Branding */}
         <div className="text-center mb-6">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-semibold tracking-wide uppercase mb-3">
-            <Sparkles className="w-3.5 h-3.5" /> First-Tap Activation
+            First-Tap Activation
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
             Aktivasi Kartu Pintar
@@ -331,6 +373,25 @@ export default function ClaimPage({ params }: { params: Promise<{ code: string }
                         </p>
                       )}
                     </div>
+
+                    {/* Link Langsung Pop-up Bintang 5 (jika Place ID bukan ChIJ) */}
+                    {!selectedPlace.place_id.startsWith('ChIJ') && (
+                      <div className="pt-2 border-t border-slate-800/80 space-y-1.5">
+                        <label className="text-[11px] font-medium text-amber-400 flex items-center gap-1">
+                          <Star className="w-3 h-3 fill-amber-400 text-amber-400" /> Link Langsung Review Bintang 5 (Opsional)
+                        </label>
+                        <input
+                          type="text"
+                          value={customReviewUrl}
+                          onChange={(e) => setCustomReviewUrl(e.target.value)}
+                          placeholder="Contoh: https://g.page/r/.../review atau kode ChIJ..."
+                          className="w-full px-3 py-2 text-xs bg-slate-900 border border-slate-700 rounded-lg text-white placeholder:text-slate-500 outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                        <p className="text-[10px] text-slate-400 leading-relaxed">
+                          Agar saat kartu di-tap langsung membuka kotak beri 5 bintang (bukan sekadar peta lokasi), tempelkan link <span className="text-slate-300 font-mono">https://g.page/r/.../review</span> dari Google Bisnis Anda atau kode <span className="text-slate-300 font-mono">ChIJ...</span>
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -344,9 +405,150 @@ export default function ClaimPage({ params }: { params: Promise<{ code: string }
                   type="text"
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
-                  placeholder="Contoh: Kafe, Resto, Salon, Klinik"
+                  placeholder="Contoh: Kafe, Resto, Denim House, Salon"
                   className="w-full px-3.5 py-2.5 text-sm bg-slate-950 border border-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 text-white placeholder:text-slate-500 outline-none transition"
                 />
+              </div>
+
+              {/* Kustomisasi Logo & Banner Header Toko */}
+              <div className="p-3.5 bg-slate-950/80 border border-slate-800 rounded-xl space-y-3.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                    <ImageIcon className="w-3.5 h-3.5 text-blue-400" />
+                    Logo & Banner Toko (Opsional)
+                  </label>
+                  {isProcessingImage && (
+                    <span className="text-[11px] text-blue-400 animate-pulse">
+                      Menyesuaikan ukuran...
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Upload Logo (1:1) */}
+                  <div className="p-3 bg-slate-900/90 border border-slate-800/90 rounded-xl flex flex-col justify-between space-y-2.5">
+                    <div>
+                      <div className="text-xs font-semibold text-white">Logo Profil Toko</div>
+                      <p className="text-[11px] text-blue-400 font-medium mt-0.5">
+                        Ukuran: 500 x 500 px (Rasio 1:1 Persegi)
+                      </p>
+                      <p className="text-[10px] text-slate-400 mt-0.5 leading-relaxed">
+                        Format JPG, PNG, atau WebP. Gambar otomatis dipotong tengah & dikompresi agar ringan.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-1">
+                      <label className="flex-1 cursor-pointer inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition">
+                        <Upload className="w-3.5 h-3.5 text-blue-400" />
+                        <span>{logoUrl ? 'Ganti Logo' : 'Pilih Logo'}</span>
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          onChange={handleLogoUpload}
+                          className="hidden"
+                        />
+                      </label>
+                      {logoUrl && (
+                        <button
+                          type="button"
+                          onClick={() => setLogoUrl('')}
+                          title="Hapus Logo"
+                          className="p-2 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 transition"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Upload Banner (16:6) */}
+                  <div className="p-3 bg-slate-900/90 border border-slate-800/90 rounded-xl flex flex-col justify-between space-y-2.5">
+                    <div>
+                      <div className="text-xs font-semibold text-white">Banner Sampul Header</div>
+                      <p className="text-[11px] text-blue-400 font-medium mt-0.5">
+                        Ukuran: 1200 x 450 px (Rasio 16:6 Landscape)
+                      </p>
+                      <p className="text-[10px] text-slate-400 mt-0.5 leading-relaxed">
+                        Format JPG, PNG, atau WebP. Tampil sebagai latar sampul di bagian atas profil toko.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-1">
+                      <label className="flex-1 cursor-pointer inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition">
+                        <Upload className="w-3.5 h-3.5 text-blue-400" />
+                        <span>{bannerUrl ? 'Ganti Banner' : 'Pilih Banner'}</span>
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          onChange={handleBannerUpload}
+                          className="hidden"
+                        />
+                      </label>
+                      {bannerUrl && (
+                        <button
+                          type="button"
+                          onClick={() => setBannerUrl('')}
+                          title="Hapus Banner"
+                          className="p-2 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 transition"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Live Preview Header Profil Toko */}
+                {(logoUrl || bannerUrl || selectedPlace) && (
+                  <div className="pt-1">
+                    <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
+                      Pratinjau Tampilan Header Toko
+                    </div>
+                    <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden text-center shadow-inner">
+                      {bannerUrl && (
+                        <div className="relative h-24 w-full bg-slate-950">
+                          <img
+                            src={bannerUrl}
+                            alt="Preview Banner"
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-slate-900/90 via-slate-900/20 to-transparent" />
+                        </div>
+                      )}
+                      <div className={bannerUrl ? 'px-4 pb-4 -mt-8 relative z-10' : 'p-4'}>
+                        <div
+                          className={`w-16 h-16 mx-auto rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center font-bold text-xl text-white shadow-md mb-2 border border-blue-400/30 overflow-hidden ${
+                            bannerUrl ? 'ring-4 ring-slate-900' : ''
+                          }`}
+                        >
+                          {logoUrl ? (
+                            <img
+                              src={logoUrl}
+                              alt="Preview Logo"
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            selectedPlace?.name ? selectedPlace.name.charAt(0).toUpperCase() : 'B'
+                          )}
+                        </div>
+                        <div className="text-sm font-bold text-white">
+                          {selectedPlace?.name || 'Nama Toko Anda'}
+                        </div>
+                        {category && (
+                          <div className="text-[10px] uppercase tracking-wider text-blue-400 font-semibold mt-0.5">
+                            {category}
+                          </div>
+                        )}
+                        {(placeAddress || selectedPlace?.address) && (
+                          <div className="flex items-center justify-center gap-1 text-slate-400 text-[11px] mt-1.5 px-2">
+                            <MapPin className="w-3 h-3 text-slate-500 shrink-0" />
+                            <span className="line-clamp-1">{placeAddress || selectedPlace?.address}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Step 2: Mode Operasional Kartu */}

@@ -12,11 +12,45 @@ export async function GET(req: NextRequest) {
   }
 
   const query = input.trim();
-  const apiKey = process.env.GOOGLE_PLACES_API_KEY;
+  const apiKey = process.env.GOOGLE_PLACES_API_KEY || process.env.GOOGLE_MAPS_API_KEY;
 
-  // 1. Jika GOOGLE_PLACES_API_KEY tersedia dan valid, kunci ketat ke wilayah Indonesia (components=country:id)
+  // 1. Jika GOOGLE_PLACES_API_KEY tersedia dan valid, gunakan Places API (New) terlebih dahulu (kompatibel dengan GCP baru & Demo Key)
   if (apiKey && apiKey !== 'your-google-places-api-key') {
     try {
+      const newPlacesRes = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': apiKey,
+        },
+        body: JSON.stringify({
+          input: query,
+          includedRegionCodes: ['id'],
+          languageCode: 'id',
+          regionCode: 'ID',
+        }),
+      });
+
+      if (newPlacesRes.ok) {
+        const newData = await newPlacesRes.json();
+        if (Array.isArray(newData.suggestions) && newData.suggestions.length > 0) {
+          const predictions = newData.suggestions
+            .map((s: any) => s.placePrediction)
+            .filter(Boolean)
+            .map((p: any) => ({
+              place_id: p.placeId,
+              description: p.text?.text || '',
+              main_text: p.structuredFormat?.mainText?.text || p.text?.text || query,
+              secondary_text: p.structuredFormat?.secondaryText?.text || 'Indonesia',
+            }));
+
+          if (predictions.length > 0) {
+            return NextResponse.json({ predictions, source: 'google_places_new_id' });
+          }
+        }
+      }
+
+      // Fallback ke Places API Legacy jika project lama
       const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(
         query
       )}&components=country:id&language=id&key=${apiKey}`;

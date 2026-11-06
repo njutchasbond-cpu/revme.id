@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAdminSupabase } from '@/lib/supabase';
 import { devCardsStore } from '@/lib/dev-store';
 import type { Card } from '@/lib/types';
+import { packMediaFallback, normalizeCardMedia } from '@/lib/image-utils';
+import { buildGoogleReviewUrl, resolveGooglePlaceViaNewApi } from '@/lib/review-url';
 
 export async function POST(req: NextRequest) {
   try {
@@ -11,7 +13,10 @@ export async function POST(req: NextRequest) {
       business_name, 
       business_category,
       business_address, 
+      logo_url,
+      banner_url,
       google_place_id, 
+      review_url: custom_review_url,
       owner_phone, 
       owner_email,
       mode = 'smart_hub',
@@ -33,9 +38,25 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Nama bisnis dan Place ID wajib diisi' }, { status: 400 });
     }
 
-    const review_url = google_place_id.startsWith('ChIJ')
-      ? `https://search.google.com/local/writereview?placeid=${google_place_id}`
-      : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(business_name + (business_address ? ' ' + business_address : ''))}`;
+    let { google_place_id: resolvedPlaceId, review_url } = buildGoogleReviewUrl({
+      google_place_id,
+      custom_review_url,
+      business_name,
+      business_address,
+    });
+
+    // Jika belum memiliki ChIJ Place ID maupun link g.page/r/, coba cari otomatis via Google Places API (New)
+    if (
+      (!resolvedPlaceId || !resolvedPlaceId.startsWith('ChIJ')) &&
+      review_url.includes('google.com/maps/search/')
+    ) {
+      const autoResolved = await resolveGooglePlaceViaNewApi(business_name, business_address);
+      if (autoResolved) {
+        resolvedPlaceId = autoResolved.place_id;
+        review_url = autoResolved.review_url;
+      }
+    }
+
     const normalizedCode = short_code.toUpperCase();
     const now = new Date().toISOString();
 
@@ -47,7 +68,9 @@ export async function POST(req: NextRequest) {
       business_name,
       business_category: business_category || null,
       business_address,
-      google_place_id,
+      logo_url: logo_url || null,
+      banner_url: banner_url || null,
+      google_place_id: resolvedPlaceId || google_place_id,
       review_url,
       owner_phone: owner_phone || null,
       owner_email: owner_email || null,
@@ -91,10 +114,12 @@ export async function POST(req: NextRequest) {
           .single();
 
         if (updatedCard) {
-          return NextResponse.json({ success: true, card: updatedCard });
+          return NextResponse.json({ success: true, card: normalizeCardMedia(updatedCard) });
         }
         if (updateErr && (updateErr.message.includes('column') || updateErr.message.includes('schema cache') || updateErr.message.includes('does not exist'))) {
           const safeUpdate = { ...updatePayload };
+          delete (safeUpdate as any).banner_url;
+          (safeUpdate as any).logo_url = packMediaFallback(logo_url, banner_url);
           delete (safeUpdate as any).shopee_url;
           delete (safeUpdate as any).tokopedia_url;
           delete (safeUpdate as any).shopeefood_url;
@@ -105,7 +130,7 @@ export async function POST(req: NextRequest) {
             .eq('id', existingCard.id)
             .select()
             .maybeSingle();
-          if (retry.data) return NextResponse.json({ success: true, card: retry.data });
+          if (retry.data) return NextResponse.json({ success: true, card: normalizeCardMedia(retry.data) });
         }
         if (updateErr) {
           console.error('Supabase update error:', updateErr);
@@ -125,7 +150,7 @@ export async function POST(req: NextRequest) {
           .single();
 
         if (insertedCard) {
-          return NextResponse.json({ success: true, card: insertedCard });
+          return NextResponse.json({ success: true, card: normalizeCardMedia(insertedCard) });
         }
         if (insertErr && (insertErr.message.includes('column') || insertErr.message.includes('schema cache') || insertErr.message.includes('does not exist'))) {
           const safeInsert = {
@@ -134,6 +159,8 @@ export async function POST(req: NextRequest) {
             created_at: now,
             ...updatePayload,
           };
+          delete (safeInsert as any).banner_url;
+          (safeInsert as any).logo_url = packMediaFallback(logo_url, banner_url);
           delete (safeInsert as any).shopee_url;
           delete (safeInsert as any).tokopedia_url;
           delete (safeInsert as any).shopeefood_url;
@@ -143,7 +170,7 @@ export async function POST(req: NextRequest) {
             .insert(safeInsert)
             .select()
             .maybeSingle();
-          if (retry.data) return NextResponse.json({ success: true, card: retry.data });
+          if (retry.data) return NextResponse.json({ success: true, card: normalizeCardMedia(retry.data) });
         }
         if (insertErr) {
           console.error('Supabase insert error:', insertErr);

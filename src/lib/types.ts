@@ -15,6 +15,7 @@ export interface Card {
   business_category?: string | null;
   business_address?: string | null;
   logo_url?: string | null;
+  banner_url?: string | null;
   google_place_id?: string | null;
   review_url?: string | null;
   

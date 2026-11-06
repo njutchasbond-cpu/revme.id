@@ -5,6 +5,9 @@
 :root {
   --background: #ffffff;
   --foreground: #0f172a;
+  --kalcer-blue: #024aad;
+  --kalcer-blue-light: #1d6ff2;
+  --kalcer-ink: #071326;
 }
 
 html {
@@ -15,6 +18,22 @@ body {
   color: var(--foreground);
   background: var(--background);
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Native <dialog> backdrop styling (modern-web-guidance: light-dismiss-a-dialog) */
+dialog::backdrop {
+  background-color: rgba(4, 13, 31, 0.82);
+  backdrop-filter: blur(6px);
+}
+
+/* Forced Colors Mode accessibility fallback (modern-web-guidance: color) */
+@media (forced-colors: active) {
+  button,
+  a,
+  [role="tab"] {
+    border: 1px solid ButtonText;
+  }
 }
 
 @keyframes floatSlow {
@@ -73,9 +92,23 @@ body {
   background: linear-gradient(
     to right,
     rgba(255, 255, 255, 0) 0%,
-    rgba(255, 255, 255, 0.07) 50%,
+    rgba(255, 255, 255, 0.1) 50%,
     rgba(255, 255, 255, 0) 100%
   );
   animation: shimmerSweep 6s ease-in-out infinite;
   pointer-events: none;
+}
+
+/* Respect prefers-reduced-motion (UI/UX Pro Max accessibility rule) */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .animate-float-card,
+  .animate-radar-pulse,
+  .animate-radar-pulse-delayed,
+  .card-shimmer::after {
+    animation: none !important;
+    transform: none !important;
+  }
 }

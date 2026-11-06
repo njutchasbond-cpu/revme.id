@@ -3,6 +3,8 @@ import { getAdminSupabase } from '@/lib/supabase';
 import { devCardsStore } from '@/lib/dev-store';
 import type { Card } from '@/lib/types';
 import { verifyAdminAccess } from '@/lib/auth';
+import { packMediaFallback, normalizeCardMedia } from '@/lib/image-utils';
+import { buildGoogleReviewUrl, resolveGooglePlaceViaNewApi } from '@/lib/review-url';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,19 +20,36 @@ export async function GET(req: NextRequest) {
 
   try {
     const adminClient = getAdminSupabase();
-    const { data: cards, error } = await adminClient
-      .from('cards')
-      .select('*')
-      .order('created_at', { ascending: false });
+    const [cardsRes, logsRes] = await Promise.allSettled([
+      adminClient
+        .from('cards')
+        .select('*')
+        .order('created_at', { ascending: false }),
+      adminClient
+        .from('interaction_logs')
+        .select('id, card_id, interaction_type, device_type, created_at')
+        .order('created_at', { ascending: false })
+        .limit(250),
+    ]);
 
-    if (error) {
-      dbError = error.message;
-    } else if (cards) {
-      return NextResponse.json({ 
-        cards, 
-        source: 'supabase',
-        total: cards.length 
-      });
+    if (cardsRes.status === 'fulfilled') {
+      const { data: cards, error } = cardsRes.value;
+      const logs =
+        logsRes.status === 'fulfilled' && Array.isArray(logsRes.value.data)
+          ? logsRes.value.data
+          : [];
+
+      if (error) {
+        dbError = error.message;
+      } else if (cards) {
+        const normalized = cards.map((c: Card) => normalizeCardMedia(c));
+        return NextResponse.json({ 
+          cards: normalized, 
+          logs,
+          source: 'supabase',
+          total: normalized.length 
+        });
+      }
     }
   } catch (err: any) {
     dbError = err.message;
@@ -39,6 +58,7 @@ export async function GET(req: NextRequest) {
   const devCards = Array.from(devCardsStore?.values() || []);
   return NextResponse.json({ 
     cards: devCards, 
+    logs: [],
     source: 'dev_store',
     supabase_error: dbError,
     supabase_configured: Boolean(
@@ -141,6 +161,7 @@ export async function PUT(req: NextRequest) {
       business_name: null,
       business_category: null,
       business_address: null,
+      logo_url: null,
       google_place_id: null,
       review_url: null,
       owner_phone: null,
@@ -220,16 +241,32 @@ export async function PATCH(req: NextRequest) {
     const normalizedCode = short_code.toUpperCase();
     const now = new Date().toISOString();
 
-    let review_url = updateFields.review_url;
-    if (updateFields.google_place_id && !review_url) {
-      review_url = updateFields.google_place_id.startsWith('ChIJ')
-        ? `https://search.google.com/local/writereview?placeid=${updateFields.google_place_id}`
-        : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((updateFields.business_name || '') + ' ' + (updateFields.business_address || ''))}`;
+    let { google_place_id: resolvedPlaceId, review_url } = buildGoogleReviewUrl({
+      google_place_id: updateFields.google_place_id,
+      custom_review_url: updateFields.review_url,
+      business_name: updateFields.business_name,
+      business_address: updateFields.business_address,
+    });
+
+    if (
+      (!resolvedPlaceId || !resolvedPlaceId.startsWith('ChIJ')) &&
+      review_url.includes('google.com/maps/search/') &&
+      updateFields.business_name
+    ) {
+      const autoResolved = await resolveGooglePlaceViaNewApi(
+        updateFields.business_name,
+        updateFields.business_address
+      );
+      if (autoResolved) {
+        resolvedPlaceId = autoResolved.place_id;
+        review_url = autoResolved.review_url;
+      }
     }
 
     const payloadToSave = {
       ...updateFields,
-      review_url: review_url || updateFields.review_url || null,
+      google_place_id: resolvedPlaceId || updateFields.google_place_id || null,
+      review_url: review_url || null,
       updated_at: now,
     };
 
@@ -245,6 +282,8 @@ export async function PATCH(req: NextRequest) {
 
       if (error && (error.message.includes('column') || error.message.includes('schema cache') || error.message.includes('does not exist'))) {
         const safePayload = { ...payloadToSave };
+        delete (safePayload as any).banner_url;
+        (safePayload as any).logo_url = packMediaFallback(updateFields.logo_url, updateFields.banner_url);
         delete (safePayload as any).shopee_url;
         delete (safePayload as any).tokopedia_url;
         delete (safePayload as any).shopeefood_url;
@@ -258,7 +297,7 @@ export async function PATCH(req: NextRequest) {
           .maybeSingle();
 
         if (retry.data) {
-          return NextResponse.json({ success: true, card: retry.data });
+          return NextResponse.json({ success: true, card: normalizeCardMedia(retry.data) });
         }
       } else if (error) {
         console.error('Supabase update error:', error);
@@ -266,7 +305,7 @@ export async function PATCH(req: NextRequest) {
       }
 
       if (data) {
-        return NextResponse.json({ success: true, card: data });
+        return NextResponse.json({ success: true, card: normalizeCardMedia(data) });
       }
     } catch (dbErr: any) {
       console.error('Database update error:', dbErr);

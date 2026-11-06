@@ -2,8 +2,14 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Tap to Review — Kartu NFC & QR Google Review',
-  description: 'Bantu bisnis lokal mengumpulkan ulasan Google Maps dalam 1 detik dengan kartu tap NFC dan scan QR.',
+  title: 'SmartHub Card by Studio Kalcer — Kartu NFC & Dynamic QR',
+  description:
+    'Bantu bisnis lokal mengumpulkan ulasan Google Maps bintang 5, membagikan WiFi, menu, dan kanal bisnis dalam 1 detik dengan kartu tap NFC dan scan QR.',
+  icons: {
+    icon: '/logo-kalcer.png',
+    shortcut: '/logo-kalcer.png',
+    apple: '/logo-kalcer.png',
+  },
 };
 
 export default function RootLayout({
@@ -17,4 +23,3 @@ export default function RootLayout({
     </html>
   );
 }
-

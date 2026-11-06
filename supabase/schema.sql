@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS public.cards (
     business_category VARCHAR(100),
     business_address TEXT,
     logo_url TEXT,
+    banner_url TEXT,
     google_place_id VARCHAR(255),
     review_url TEXT,
     

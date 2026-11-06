@@ -4,6 +4,7 @@ import { devCardsStore } from '@/lib/dev-store';
 import SmartHubClient from './SmartHubClient';
 import type { Card } from '@/lib/types';
 import { AlertCircle } from 'lucide-react';
+import { resolveGooglePlaceViaNewApi } from '@/lib/review-url';
 
 export const dynamic = 'force-dynamic';
 
@@ -91,6 +92,33 @@ export default async function CardAccessPage({ params }: PageProps) {
     );
   }
 
+  // Auto-upgrade kartu lama yang sebelumnya belum memiliki link writereview ChIJ...
+  const needsReviewUpgrade =
+    Boolean(card.business_name) &&
+    (!card.review_url ||
+      card.review_url.includes('google.com/maps/search/') ||
+      !card.google_place_id ||
+      !card.google_place_id.startsWith('ChIJ'));
+
+  let upgradedFields: { google_place_id?: string; review_url?: string } = {};
+
+  if (needsReviewUpgrade && card.business_name) {
+    if (card.google_place_id && card.google_place_id.startsWith('ChIJ')) {
+      card.review_url = `https://search.google.com/local/writereview?placeid=${card.google_place_id}`;
+      upgradedFields = { review_url: card.review_url };
+    } else {
+      const resolved = await resolveGooglePlaceViaNewApi(card.business_name, card.business_address);
+      if (resolved) {
+        card.google_place_id = resolved.place_id;
+        card.review_url = resolved.review_url;
+        upgradedFields = {
+          google_place_id: resolved.place_id,
+          review_url: resolved.review_url,
+        };
+      }
+    }
+  }
+
   // Skenario C: Kartu Aktif - Catat tap log secara background asinkron (tidak memblokir redirect/render)
   if (card.id && !card.id.startsWith('mock-')) {
     try {
@@ -102,13 +130,18 @@ export default async function CardAccessPage({ params }: PageProps) {
         }),
         adminClient
           .from('cards')
-          .update({ tap_count: (card.tap_count || 0) + 1 })
+          .update({
+            tap_count: (card.tap_count || 0) + 1,
+            ...upgradedFields,
+          })
           .eq('id', card.id),
       ]).catch(() => {});
     } catch (e) {}
   } else if (devCardsStore?.has(shortCode)) {
     const devItem = devCardsStore.get(shortCode)!;
     devItem.tap_count = (devItem.tap_count || 0) + 1;
+    if (upgradedFields.google_place_id) devItem.google_place_id = upgradedFields.google_place_id;
+    if (upgradedFields.review_url) devItem.review_url = upgradedFields.review_url;
   }
 
   // Jika mode Direct Review aktif dan link ulasan tersedia
