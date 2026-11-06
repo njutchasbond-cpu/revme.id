@@ -290,10 +290,10 @@ export default function HomePage() {
               <div className="bg-slate-900/90 border-2 border-blue-500/40 rounded-2xl p-3 sm:p-4 shadow-2xl shadow-blue-950/40 text-left relative">
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-[11px] font-bold uppercase tracking-wider text-blue-400 flex items-center gap-1.5">
-                    <Search className="w-3.5 h-3.5" /> Coba Sekarang: Ketik Nama Toko / Kafe Anda
+                    <Search className="w-3.5 h-3.5" /> Simulasi Gratis: Ketik Nama Usaha & Kota Anda (Indonesia)
                   </label>
                   <span className="text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
-                    Live Preview Instan
+                    Wilayah Indonesia
                   </span>
                 </div>
 
@@ -303,7 +303,13 @@ export default function HomePage() {
                     value={brandSearch}
                     onChange={(e) => handleManualBrandTyping(e.target.value)}
                     onFocus={() => predictions.length > 0 && setShowDropdown(true)}
-                    placeholder="Contoh: Kopi Senja, Barbershop Kalcer, Toko Berkah..."
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        setShowDropdown(false);
+                      }
+                    }}
+                    placeholder="Contoh: Kopi Senja Jakarta, AWB Pringsewu, Salon Cantika..."
                     className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 focus:border-blue-500 rounded-xl text-sm text-white placeholder:text-slate-500 outline-none transition"
                   />
                   {brandSearch && (
@@ -313,6 +319,7 @@ export default function HomePage() {
                         setBrandSearch('');
                         handleManualBrandTyping('');
                         setPredictions([]);
+                        setShowDropdown(false);
                       }}
                       className="px-3 text-xs text-slate-400 hover:text-white bg-slate-800 rounded-xl transition"
                     >
