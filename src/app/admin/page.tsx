@@ -15,7 +15,9 @@ import {
   ShieldAlert,
   QrCode,
   X,
-  FileArchive
+  FileArchive,
+  Pencil,
+  RotateCcw
 } from 'lucide-react';
 import type { Card } from '@/lib/types';
 
@@ -24,6 +26,10 @@ export default function AdminPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'unclaimed' | 'active'>('all');
+
+  // Edit State
+  const [editingCard, setEditingCard] = useState<Card | null>(null);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   // Generator State
   const [isGenerating, setIsGenerating] = useState(false);
@@ -105,6 +111,35 @@ export default function AdminPage() {
       await fetchCards();
     } catch (err: any) {
       alert(err.message);
+    }
+  };
+
+  const handleOpenEdit = (c: Card) => {
+    setEditingCard({ ...c });
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingCard) return;
+
+    setIsSavingEdit(true);
+    try {
+      const res = await fetch('/api/admin/cards', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editingCard),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Gagal menyimpan perubahan.');
+
+      setMessage({ text: `Data kartu #${editingCard.short_code} berhasil diperbarui!`, type: 'success' });
+      setEditingCard(null);
+      await fetchCards();
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setIsSavingEdit(false);
     }
   };
 
@@ -468,6 +503,24 @@ export default function AdminPage() {
                           </td>
                           <td className="py-2.5 px-3 text-right space-x-1.5 whitespace-nowrap">
                             
+                            {/* Tombol Edit Data */}
+                            <button
+                              onClick={() => handleOpenEdit(c)}
+                              className="inline-flex items-center gap-1 p-1.5 text-gray-600 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition"
+                              title="Edit Data Kartu"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+
+                            {/* Tombol Reset Data */}
+                            <button
+                              onClick={() => handleResetCard(c.short_code)}
+                              className="inline-flex items-center gap-1 p-1.5 text-gray-600 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
+                              title="Reset Data Kartu ke Unclaimed"
+                            >
+                              <RotateCcw className="w-3.5 h-3.5" />
+                            </button>
+
                             {/* Tombol Preview & Unduh QR Satuan */}
                             <button
                               onClick={() => handleOpenQrPreview(c)}
@@ -483,21 +536,10 @@ export default function AdminPage() {
                               target="_blank"
                               rel="noreferrer"
                               className="inline-flex items-center gap-1 p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                              title="Test Tap Redirect"
+                              title="Buka Halaman Kartu"
                             >
                               <ExternalLink className="w-3.5 h-3.5" />
                             </a>
-
-                            {/* Tombol Force Reset */}
-                            {c.status === 'active' && (
-                              <button
-                                onClick={() => handleResetCard(c.short_code)}
-                                className="inline-flex items-center gap-1 p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition"
-                                title="Force Reset to Unclaimed"
-                              >
-                                <ShieldAlert className="w-3.5 h-3.5" />
-                              </button>
-                            )}
                           </td>
                         </tr>
                       ))
@@ -511,6 +553,301 @@ export default function AdminPage() {
         </div>
 
       </div>
+
+      {/* Modal Edit Data Kartu */}
+      {editingCard && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-xl w-full shadow-2xl border border-gray-100 my-8 overflow-hidden">
+            
+            {/* Header Modal */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gray-50/50">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800">
+                    #{editingCard.short_code}
+                  </span>
+                  <h3 className="text-base font-bold text-gray-900">
+                    Edit Data Kartu
+                  </h3>
+                </div>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Perbarui profil bisnis, status, dan seluruh tautan All-in-One.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingCard(null)}
+                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Form Edit */}
+            <form onSubmit={handleSaveEdit}>
+              <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto text-xs">
+                
+                {/* Status & Mode */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-semibold text-gray-700 mb-1">Status Kartu</label>
+                    <select
+                      value={editingCard.status}
+                      onChange={(e) => setEditingCard({ ...editingCard, status: e.target.value as any })}
+                      className="w-full px-3 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                    >
+                      <option value="unclaimed">UNCLAIMED (Belum Diklaim)</option>
+                      <option value="active">ACTIVE (Aktif Terhubung)</option>
+                      <option value="inactive">INACTIVE (Nonaktif)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-gray-700 mb-1">Mode Operasional</label>
+                    <select
+                      value={editingCard.mode || 'smart_hub'}
+                      onChange={(e) => setEditingCard({ ...editingCard, mode: e.target.value as any })}
+                      className="w-full px-3 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                    >
+                      <option value="smart_hub">All-in-One Smart Hub</option>
+                      <option value="direct_review">Direct Review (Langsung Google Review)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Profil Bisnis */}
+                <div className="space-y-3 pt-2 border-t border-gray-100">
+                  <h4 className="font-bold text-gray-900 uppercase text-[10px] tracking-wider text-blue-600">
+                    Profil Bisnis
+                  </h4>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-gray-600 mb-1">Nama Bisnis</label>
+                      <input
+                        type="text"
+                        value={editingCard.business_name || ''}
+                        onChange={(e) => setEditingCard({ ...editingCard, business_name: e.target.value })}
+                        placeholder="Contoh: Alone Wear Brand"
+                        className="w-full px-3 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-gray-600 mb-1">Kategori Bisnis</label>
+                      <input
+                        type="text"
+                        value={editingCard.business_category || ''}
+                        onChange={(e) => setEditingCard({ ...editingCard, business_category: e.target.value })}
+                        placeholder="Contoh: Denim House, Kafe, Resto"
+                        className="w-full px-3 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-gray-600 mb-1">Alamat Resmi</label>
+                    <textarea
+                      rows={2}
+                      value={editingCard.business_address || ''}
+                      onChange={(e) => setEditingCard({ ...editingCard, business_address: e.target.value })}
+                      placeholder="Contoh: Jl. Sukoharjo III, Pringsewu, Lampung"
+                      className="w-full px-3 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-gray-600 mb-1">Nomor WhatsApp Pemilik</label>
+                      <input
+                        type="text"
+                        value={editingCard.owner_phone || editingCard.whatsapp_number || ''}
+                        onChange={(e) => setEditingCard({ 
+                          ...editingCard, 
+                          owner_phone: e.target.value,
+                          whatsapp_number: e.target.value 
+                        })}
+                        placeholder="081234567890"
+                        className="w-full px-3 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-gray-600 mb-1">Google Place ID (Opsional)</label>
+                      <input
+                        type="text"
+                        value={editingCard.google_place_id || ''}
+                        onChange={(e) => setEditingCard({ ...editingCard, google_place_id: e.target.value })}
+                        placeholder="ChIJ..."
+                        className="w-full px-3 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* WiFi Pengunjung */}
+                <div className="space-y-3 pt-2 border-t border-gray-100">
+                  <h4 className="font-bold text-gray-900 uppercase text-[10px] tracking-wider text-blue-600">
+                    Akses WiFi Pengunjung
+                  </h4>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-gray-600 mb-1">Nama WiFi (SSID)</label>
+                      <input
+                        type="text"
+                        value={editingCard.wifi_ssid || ''}
+                        onChange={(e) => setEditingCard({ ...editingCard, wifi_ssid: e.target.value })}
+                        placeholder="WiFi_Tamu"
+                        className="w-full px-3 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-gray-600 mb-1">Kata Sandi WiFi</label>
+                      <input
+                        type="text"
+                        value={editingCard.wifi_password || ''}
+                        onChange={(e) => setEditingCard({ ...editingCard, wifi_password: e.target.value })}
+                        placeholder="sandiwifi"
+                        className="w-full px-3 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tautan Layanan & Media Sosial */}
+                <div className="space-y-3 pt-2 border-t border-gray-100">
+                  <h4 className="font-bold text-gray-900 uppercase text-[10px] tracking-wider text-blue-600">
+                    Menu, Layanan & Media Sosial
+                  </h4>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-gray-600 mb-1">Link Buku Menu / PDF</label>
+                      <input
+                        type="text"
+                        value={editingCard.menu_url || ''}
+                        onChange={(e) => setEditingCard({ ...editingCard, menu_url: e.target.value })}
+                        placeholder="https://..."
+                        className="w-full px-3 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-gray-600 mb-1">Link Layanan / Reservasi</label>
+                      <input
+                        type="text"
+                        value={editingCard.services_url || ''}
+                        onChange={(e) => setEditingCard({ ...editingCard, services_url: e.target.value })}
+                        placeholder="https://..."
+                        className="w-full px-3 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <label className="block text-gray-600 mb-1">Username IG</label>
+                      <input
+                        type="text"
+                        value={editingCard.instagram_username || ''}
+                        onChange={(e) => setEditingCard({ ...editingCard, instagram_username: e.target.value })}
+                        placeholder="username"
+                        className="w-full px-2.5 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-gray-600 mb-1">Username TikTok</label>
+                      <input
+                        type="text"
+                        value={editingCard.tiktok_username || ''}
+                        onChange={(e) => setEditingCard({ ...editingCard, tiktok_username: e.target.value })}
+                        placeholder="username"
+                        className="w-full px-2.5 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-gray-600 mb-1">Situs Web</label>
+                      <input
+                        type="text"
+                        value={editingCard.website_url || ''}
+                        onChange={(e) => setEditingCard({ ...editingCard, website_url: e.target.value })}
+                        placeholder="https://..."
+                        className="w-full px-2.5 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Marketplace & Delivery */}
+                <div className="space-y-3 pt-2 border-t border-gray-100">
+                  <h4 className="font-bold text-gray-900 uppercase text-[10px] tracking-wider text-blue-600">
+                    Marketplace & Food Delivery
+                  </h4>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-gray-600 mb-1">Link Toko Shopee</label>
+                      <input
+                        type="text"
+                        value={editingCard.shopee_url || ''}
+                        onChange={(e) => setEditingCard({ ...editingCard, shopee_url: e.target.value })}
+                        placeholder="https://shopee.co.id/..."
+                        className="w-full px-3 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-gray-600 mb-1">Link Toko Tokopedia</label>
+                      <input
+                        type="text"
+                        value={editingCard.tokopedia_url || ''}
+                        onChange={(e) => setEditingCard({ ...editingCard, tokopedia_url: e.target.value })}
+                        placeholder="https://tokopedia.com/..."
+                        className="w-full px-3 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-gray-600 mb-1">Link ShopeeFood</label>
+                      <input
+                        type="text"
+                        value={editingCard.shopeefood_url || ''}
+                        onChange={(e) => setEditingCard({ ...editingCard, shopeefood_url: e.target.value })}
+                        placeholder="https://shopeefood..."
+                        className="w-full px-3 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-gray-600 mb-1">Link GoFood</label>
+                      <input
+                        type="text"
+                        value={editingCard.gofood_url || ''}
+                        onChange={(e) => setEditingCard({ ...editingCard, gofood_url: e.target.value })}
+                        placeholder="https://gofood..."
+                        className="w-full px-3 py-2 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Footer Modal Actions */}
+              <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-gray-100 bg-gray-50/50">
+                <button
+                  type="button"
+                  onClick={() => setEditingCard(null)}
+                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-medium transition"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingEdit}
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-xl font-semibold transition shadow-sm"
+                >
+                  {isSavingEdit ? 'Menyimpan...' : 'Simpan Perubahan'}
+                </button>
+              </div>
+            </form>
+
+          </div>
+        </div>
+      )}
 
       {/* Modal Preview QR Code Satuan */}
       {previewCard && (

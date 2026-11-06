@@ -175,3 +175,71 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
+
+// Update / Edit Data Kartu dari Admin
+export async function PATCH(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { short_code, ...updateFields } = body;
+
+    if (!short_code) {
+      return NextResponse.json({ error: 'short_code wajib diisi' }, { status: 400 });
+    }
+
+    const normalizedCode = short_code.toUpperCase();
+    const now = new Date().toISOString();
+
+    let review_url = updateFields.review_url;
+    if (updateFields.google_place_id && !review_url) {
+      review_url = updateFields.google_place_id.startsWith('ChIJ')
+        ? `https://search.google.com/local/writereview?placeid=${updateFields.google_place_id}`
+        : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((updateFields.business_name || '') + ' ' + (updateFields.business_address || ''))}`;
+    }
+
+    const payloadToSave = {
+      ...updateFields,
+      review_url: review_url || updateFields.review_url || null,
+      updated_at: now,
+    };
+
+    // 1. Update di Supabase
+    try {
+      const adminClient = getAdminSupabase();
+      const { data, error } = await adminClient
+        .from('cards')
+        .update(payloadToSave)
+        .eq('short_code', normalizedCode)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Supabase update error:', error);
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+
+      if (data) {
+        return NextResponse.json({ success: true, card: data });
+      }
+    } catch (dbErr: any) {
+      console.error('Database update error:', dbErr);
+      return NextResponse.json({ error: dbErr.message }, { status: 500 });
+    }
+
+    // 2. Dev Store Fallback
+    if (devCardsStore) {
+      const devCard = devCardsStore.get(normalizedCode);
+      if (devCard) {
+        const merged: Card = {
+          ...devCard,
+          ...payloadToSave,
+        };
+        devCardsStore.set(normalizedCode, merged);
+        return NextResponse.json({ success: true, card: merged });
+      }
+    }
+
+    return NextResponse.json({ error: 'Kartu tidak ditemukan' }, { status: 404 });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}
