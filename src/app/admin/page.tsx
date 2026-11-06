@@ -43,7 +43,7 @@ export default function AdminPage() {
   const fetchCards = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch('/api/admin/cards');
+      const res = await fetch(`/api/admin/cards?t=${Date.now()}`, { cache: 'no-store' });
       const data = await res.json();
       if (data.cards) {
         setCards(data.cards);

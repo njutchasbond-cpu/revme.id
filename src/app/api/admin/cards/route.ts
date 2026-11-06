@@ -3,6 +3,8 @@ import { getAdminSupabase } from '@/lib/supabase';
 import { devCardsStore } from '@/lib/dev-store';
 import type { Card } from '@/lib/types';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: NextRequest) {
   let dbError: string | null = null;
 
@@ -43,7 +45,7 @@ export async function POST(req: NextRequest) {
   try {
     const { count = 10, prefix = 'DW', batch_name = 'BATCH-01' } = await req.json();
 
-    const newCards: Card[] = [];
+    const newCards: Array<Omit<Card, 'id'>> = [];
     const now = new Date().toISOString();
 
     for (let i = 1; i <= Number(count); i++) {
@@ -51,7 +53,6 @@ export async function POST(req: NextRequest) {
       const short_code = `${prefix}${randomStr}`;
 
       newCards.push({
-        id: `card-${short_code}`,
         short_code,
         status: 'unclaimed',
         mode: 'smart_hub',
@@ -62,33 +63,40 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Coba simpan ke Supabase
+    // 1. Simpan ke Supabase (id otomatis UUID dari database via gen_random_uuid)
     try {
       const adminClient = getAdminSupabase();
       const { data, error } = await adminClient.from('cards').insert(newCards).select();
-      if (data) {
-        return NextResponse.json({ success: true, count: data.length, cards: data, source: 'supabase' });
-      }
       if (error) {
         console.error('Supabase batch insert error:', error);
+        return NextResponse.json({ error: `Gagal menyimpan ke database: ${error.message}` }, { status: 500 });
       }
-    } catch (dbErr) {
-      // Abaikan jika Supabase offline
+      if (data && data.length > 0) {
+        return NextResponse.json({ success: true, count: data.length, cards: data, source: 'supabase' });
+      }
+    } catch (dbErr: any) {
+      console.error('Database connection error:', dbErr);
+      return NextResponse.json({ error: `Koneksi database bermasalah: ${dbErr.message}` }, { status: 500 });
     }
 
-    // Dev Store Fallback
+    // 2. Dev Store Fallback jika Supabase offline
     if (devCardsStore) {
-      for (const c of newCards) {
+      const mockCards: Card[] = newCards.map(c => ({
+        ...c,
+        id: `mock-${c.short_code}`,
+      }));
+      for (const c of mockCards) {
         devCardsStore.set(c.short_code, c);
       }
+      return NextResponse.json({
+        success: true,
+        count: mockCards.length,
+        cards: mockCards,
+        source: 'dev_store',
+      });
     }
 
-    return NextResponse.json({
-      success: true,
-      count: newCards.length,
-      cards: newCards,
-      note: 'Tersimpan dalam memory store pengembangan',
-    });
+    return NextResponse.json({ error: 'Tidak dapat menyimpan kartu.' }, { status: 500 });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
