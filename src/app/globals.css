@@ -7,9 +7,75 @@
   --foreground: #0f172a;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   color: var(--foreground);
   background: var(--background);
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
 }
 
+@keyframes floatSlow {
+  0%, 100% {
+    transform: translate3d(0, 0px, 0) rotate(-1deg);
+  }
+  50% {
+    transform: translate3d(0, -10px, 0) rotate(0.5deg);
+  }
+}
+
+@keyframes radarPulse {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.75;
+  }
+  70% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+@keyframes shimmerSweep {
+  0% {
+    transform: translateX(-150%) skewX(-20deg);
+  }
+  50%, 100% {
+    transform: translateX(250%) skewX(-20deg);
+  }
+}
+
+.animate-float-card {
+  animation: floatSlow 5.5s ease-in-out infinite;
+  will-change: transform;
+}
+
+.animate-radar-pulse {
+  animation: radarPulse 2.4s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+.animate-radar-pulse-delayed {
+  animation: radarPulse 2.4s cubic-bezier(0, 0, 0.2, 1) 1.2s infinite;
+}
+
+.card-shimmer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 45%;
+  height: 100%;
+  background: linear-gradient(
+    to right,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.07) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  animation: shimmerSweep 6s ease-in-out infinite;
+  pointer-events: none;
+}

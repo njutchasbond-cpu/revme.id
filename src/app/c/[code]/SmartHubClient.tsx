@@ -410,22 +410,33 @@ export default function SmartHubClient({ card }: SmartHubClientProps) {
 
         </div>
 
-        {/* Footer */}
-        <footer className="pt-6 pb-4 text-center">
-          <p className="text-[11px] text-slate-600">
-            Diberdayakan oleh{' '}
+        {/* Footer & B2B Viral Loop */}
+        <footer className="pt-6 pb-4 text-center space-y-2.5">
+          <div className="inline-block">
             <a
-              href="https://studiokalcer.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-slate-500 hover:text-slate-400 underline underline-offset-2 transition"
+              href="/"
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900/90 border border-slate-800/80 text-[10px] font-medium text-slate-400 hover:text-blue-400 hover:border-blue-500/30 transition"
             >
-              studiokalcer.com
+              <span>Ingin kartu pintar NFC seperti ini untuk bisnis Anda?</span>
+              <span className="text-blue-400 font-semibold underline underline-offset-2">Coba Gratis</span>
             </a>
-          </p>
-          <p className="text-[10px] text-slate-700 mt-0.5">
-            Kode Seri: {card.short_code}
-          </p>
+          </div>
+          <div>
+            <p className="text-[11px] text-slate-600">
+              Diberdayakan oleh{' '}
+              <a
+                href="https://studiokalcer.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-slate-500 hover:text-slate-400 underline underline-offset-2 transition"
+              >
+                studiokalcer.com
+              </a>
+            </p>
+            <p className="text-[10px] text-slate-700 mt-0.5">
+              Kode Seri: {card.short_code}
+            </p>
+          </div>
         </footer>
 
       </main>
